@@ -20,3 +20,8 @@ paper/*.fdb_latexmk
 paper/*.pdf
 *.ckpt.pt
 models/yolov8s_*.onnx
+data/coco128/
+data/subset_smoke/
+models_smoke/
+perturbations_smoke/
+results/smoke/

@@ -208,7 +208,8 @@ def trace_figure(raw, figdir, fps):
     import matplotlib.pyplot as plt
     runs = {}
     for c in "CD":
-        g = sorted(glob.glob(os.path.join(raw, "*", "*_%s_*_r00.csv" % c)))
+        g = sorted(glob.glob(os.path.join(raw, "*", "*_%s_*_r00.csv" % c)) +
+                   glob.glob(os.path.join(raw, "*", "*_%s_*_r00.csv.gz" % c)))
         g = [f for f in g if pd.read_csv(f, nrows=1)["mode"].iloc[0] == "open"]
         if g:
             runs[c] = pd.read_csv(g[0])

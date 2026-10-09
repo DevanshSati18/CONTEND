@@ -117,7 +117,7 @@ def main():
     frames = frame_cache(cfg, imgsz)
     delta = None
     if a.input == "adv":
-        delta = load_delta(a.delta or p("perturbations/%s_%d.npy" % (cfg["model"]["name"], imgsz)))
+        delta = load_delta(a.delta or os.path.join(p(cfg["paths"]["perturbations"]), "%s_%d.npy" % (cfg["model"]["name"], imgsz)))
     nms_cfg = dict(cfg["nms"])
     a.backend = a.backend or cfg["runtime"]["backend"]
     be = __import__("backends").make_backend(a.backend, a.model, nms_cfg)

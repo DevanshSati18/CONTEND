@@ -26,7 +26,7 @@ from common import image_path, letterbox, load_config, p, read_rgb, save_json, s
 
 
 def load_attack_frames(cfg, imgsz, limit=None):
-    with open(p("data/subset/attack_ids.txt")) as f:
+    with open(os.path.join(os.path.dirname(p(cfg["paths"]["subset_ids"])), "attack_ids.txt")) as f:
         ids = [x.strip() for x in f if x.strip()][:limit]
     frames = np.stack([letterbox(read_rgb(image_path(cfg, i)), imgsz) for i in ids])
     return torch.from_numpy(frames).permute(0, 3, 1, 2).float() / 255.0
@@ -73,7 +73,7 @@ def main():
     eps, steps = float(ac["eps"]), a.steps or int(ac["steps"])
     tgt = None if a.target_class < 0 else a.target_class
     name = os.path.splitext(os.path.basename(a.model))[0]
-    out = a.out or p("perturbations/%s_%d.npy" % (name, a.imgsz))
+    out = a.out or os.path.join(p(cfg["paths"]["perturbations"]), "%s_%d.npy" % (name, a.imgsz))
     ckpt = out.replace(".npy", ".ckpt.pt")
     delta = torch.zeros(1, 3, a.imgsz, a.imgsz, device=dev, requires_grad=True)
     opt = torch.optim.Adam([delta], lr=float(ac["lr"]))

@@ -10,6 +10,7 @@ G1 passes if mean candidates rise >= 10x AND the 95% CI of the NMS-time increase
 """
 import argparse
 import json
+import os
 
 import numpy as np
 
@@ -35,7 +36,7 @@ def main():
     cfg = load_config()
     frames = frame_cache(cfg, a.imgsz)[:a.n]
     name = cfg["model"]["name"]
-    delta = np.load(a.delta or p("perturbations/%s_%d.npy" % (name, a.imgsz))).astype(np.float32)
+    delta = np.load(a.delta or os.path.join(p(cfg["paths"]["perturbations"]), "%s_%d.npy" % (name, a.imgsz))).astype(np.float32)
     be = make_backend(a.backend, a.model, dict(cfg["nms"]))
     for fr in frames[:20]:                                   # warm-up
         be.process(fr, None)
@@ -59,7 +60,6 @@ def main():
     print("G1 %s: candidates x%.1f, NMS +%.2f ms (95%% CI %.2f to %.2f)" %
           ("PASS" if out["G1_pass"] else "FAIL", ratio, dn.mean(), lo, hi))
     if a.out:
-        import os
         os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
         with open(a.out, "w") as f:
             json.dump(out, f, indent=2)

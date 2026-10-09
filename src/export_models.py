@@ -16,9 +16,10 @@ def main():
     ap.add_argument("--models", nargs="+", default=["yolov8n", "yolov8s"])
     ap.add_argument("--sizes", nargs="+", type=int, default=[640, 416, 320])
     ap.add_argument("--opset", type=int, default=12)
+    ap.add_argument("--outdir", default="models")
     a = ap.parse_args()
     from ultralytics import YOLO
-    os.makedirs(p("models"), exist_ok=True)
+    os.makedirs(p(a.outdir), exist_ok=True)
     for m in a.models:
         pt = p("models/%s.pt" % m)
         model = YOLO(pt if os.path.exists(pt) else m + ".pt")
@@ -26,7 +27,7 @@ def main():
             shutil.move(m + ".pt", pt)
         for s in a.sizes:
             out = model.export(format="onnx", imgsz=s, opset=a.opset, simplify=True, dynamic=False, batch=1)
-            dst = p("models/%s_%d.onnx" % (m, s))
+            dst = os.path.join(p(a.outdir), "%s_%d.onnx" % (m, s))
             shutil.move(out, dst)
             print("exported", dst)
 

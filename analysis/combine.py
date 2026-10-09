@@ -8,7 +8,7 @@ Writes  results/combined/contend_runs.csv      one row per run, all devices (the
         results/combined/contend_rq2_nms.csv   NMS-stage sensitivity per device x contention
         results/combined/contend_rq3.csv       deadline metrics per device x cell
         results/combined/fig5_cross_device_rq1.(pdf|png)
-Devices whose platform_class is 'dev' are kept in the CSVs (flagged) but left out of the figure.
+Devices whose platform_class is 'dev' or 'smoke' are kept in the CSVs (flagged) but left out of the figure.
 """
 import glob
 import json
@@ -74,7 +74,7 @@ def figure(df, out):
     """Fig. 5: RQ1 ratio per contention type, one marker per edge device (dev excluded)."""
     if df.empty:
         return
-    df = df[df["platform_class"] != "dev"]
+    df = df[~df["platform_class"].isin(["dev", "smoke"])]
     if df.empty:
         return
     import matplotlib

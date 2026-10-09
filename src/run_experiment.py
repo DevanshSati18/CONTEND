@@ -43,7 +43,7 @@ class Runner(object):
         pin_to_cores(cfg["platform"]["detector_cores"])
         self.imgsz = a.imgsz or cfg["model"]["imgsz"]
         self.frames = frame_cache(cfg, self.imgsz)
-        dpath = a.delta or p("perturbations/%s_%d.npy" % (cfg["model"]["name"], self.imgsz))
+        dpath = a.delta or os.path.join(p(cfg["paths"]["perturbations"]), "%s_%d.npy" % (cfg["model"]["name"], self.imgsz))
         self.delta = np.load(dpath).astype(np.float32)
         a.backend = a.backend or cfg["runtime"]["backend"]
         self.be = make_backend(a.backend, a.model, dict(cfg["nms"]))
@@ -120,9 +120,10 @@ class Runner(object):
             self.trial(name, cell, b["contention"], b["mode"], rep, order)
 
 
-def g2(r, n_frames=500):
+def g2(r, n_frames=None):
     """Gate G2: each co-runner must slow clean closed-loop latency by >= 10%."""
     import pandas as pd
+    n_frames = n_frames or min(500, r.cfg["stream"]["closed_frames"])
     res = {}
     for name in [k for k in r.cfg["contention"] if k != "none"]:
         base = r.trial("G2", "A", name, "closed", 0, 0, n_frames=n_frames)
@@ -145,7 +146,7 @@ def pilot(r, reps=3):
     import pandas as pd
     for cell in "ABCD":
         for k in range(reps):
-            r.trial("PILOT", cell, "mem_high", "closed", k, 0, n_frames=1000)
+            r.trial("PILOT", cell, "mem_high", "closed", k, 0, n_frames=min(1000, r.cfg["stream"]["closed_frames"]))
     rows = []
     for cell in "ABCD":
         ms = [pd.read_csv(os.path.join(r.raw, "PILOT", "PILOT_%s_mem_high_r%02d.csv.gz" % (cell, k)))["latency_ms"].mean()

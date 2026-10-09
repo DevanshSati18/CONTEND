@@ -231,3 +231,15 @@ hypotheses or margin after pre-registration; log any deviation in `docs/CHANGELO
 **Not testable here:** the TensorRT backend and the Jetson scripts (no Jetson in the sandbox).
 Run `python3 src/harness.py --backend trt --model models/<name>.engine --mode closed --input clean
 --frames 100 --out results/raw/smoke.csv` first on the Nano and send me any error.
+
+## Smoke test — check the whole pipeline in ~5 minutes (no device or full COCO needed)
+
+```bash
+bash scripts/smoke_test.sh        # prints a PASS/FAIL table, writes results/smoke/SMOKE_REPORT.md
+```
+Runs all 22 stages with tiny settings (`configs/devices/smoke.yaml`): 128-image COCO sample
+(auto-downloaded), 32-image subset, 20-step attack, 60-frame runs, 2 runs per cell, gates G1-G3,
+blocks E1-E3, resume check, analysis, both synthetic validation scenarios, cross-device combine,
+and a schema check. Fully isolated (`results/smoke/`, `*_smoke/`); its numbers are meaningless.
+Run it first on every new device (Raspberry Pi, Jetson) before the real gates. The full study
+uses the same code with the real settings: 300 attack steps, 500 images, 3000-frame runs.
