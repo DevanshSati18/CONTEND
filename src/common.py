@@ -134,22 +134,26 @@ def pin_to_cores(cores):
     Without the thread cap, torch/ORT spawn one thread per machine core and oversubscribe the
     pinned cores: measured 5.6x slower CPU NMS (37.9 vs 6.8 ms) - an artifact that would
     also interact with the co-runners and contaminate the experiment."""
-    if cores and hasattr(os, "sched_setaffinity"):
+    if not cores:
+        return
+    if hasattr(os, "sched_setaffinity"):
         os.sched_setaffinity(0, set(cores))
-        n = len(cores)
-        os.environ["OMP_NUM_THREADS"] = str(n)
-        try:
-            import torch
-            torch.set_num_threads(n)
-        except Exception:
-            pass
+    else:   # macOS has no core pinning: still cap threads; results are not core-isolated
+        sys.stderr.write("WARNING: core pinning not supported on this OS; threads capped only\n")
+    n = len(cores)
+    os.environ["OMP_NUM_THREADS"] = str(n)
+    try:
+        import torch
+        torch.set_num_threads(n)
+    except Exception:
+        pass
 
 
 def n_pinned_cores():
     try:
         return len(os.sched_getaffinity(0))
     except Exception:
-        return None
+        return int(os.environ["OMP_NUM_THREADS"]) if os.environ.get("OMP_NUM_THREADS") else None
 
 
 def env_info():

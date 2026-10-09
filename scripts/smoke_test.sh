@@ -8,9 +8,29 @@
 # it, copy models_smoke/ and perturbations_smoke/ from a machine that has it).
 set -uo pipefail
 cd "$(dirname "$0")/.."
-[ -f .venv/bin/activate ] && source .venv/bin/activate
 export CONTEND_DEVICE=smoke PYTHONWARNINGS=ignore
 PY=python3
+NEED="numpy cv2 torch torchvision onnxruntime pandas scipy statsmodels matplotlib yaml"
+env_ok() { $PY - <<PYEOF 2>/dev/null
+import importlib.util, sys
+missing = [m for m in "$NEED".split() if importlib.util.find_spec(m) is None]
+print("missing: " + " ".join(missing) if missing else "ok"); sys.exit(1 if missing else 0)
+PYEOF
+}
+# 0. environment: use the project .venv; create it if the current Python lacks packages
+[ -f .venv/bin/activate ] && source .venv/bin/activate
+if ! env_ok >/dev/null; then
+  echo "Python at $(command -v $PY) is missing packages: $(env_ok)"
+  if [ ! -d .venv ]; then
+    echo "Creating the project environment .venv (one time, a few minutes)..."
+    (conda deactivate 2>/dev/null || true)
+    $PY -m venv .venv && source .venv/bin/activate && pip install -q --upgrade pip \
+      && pip install -q -r requirements-host.txt || { echo "pip install failed"; exit 1; }
+  fi
+  env_ok >/dev/null || { echo "Still missing: $(env_ok). Run: source .venv/bin/activate && pip install -r requirements-host.txt"; exit 1; }
+fi
+echo "Python: $(command -v $PY) ($($PY -c 'import sys;print(sys.version.split()[0])'))"
+command -v taskset >/dev/null || echo "NOTE: no 'taskset' (macOS): runs are not pinned to cores - fine for a smoke test, not for real data."
 LOG=results/smoke/smoke.log
 [ "${KEEP:-0}" = 1 ] || rm -rf results/smoke data/subset_smoke perturbations_smoke
 mkdir -p results/smoke
@@ -42,6 +62,7 @@ if has_ultra; then
   step "4  attack perturbation (20 steps)"                    $PY src/attack_uap.py --model models/yolov8n.pt --imgsz 320
 fi
 M=models_smoke/yolov8n_320.onnx
+[ -f "$M" ] || { echo "Missing $M: install ultralytics (pip install ultralytics) so steps 3-4 can build it."; exit 1; }
 step "5  frame cache"                                         $PY -c "import sys; sys.path.insert(0,'src'); from common import *; print(frame_cache(load_config(),320).shape)"
 step "6  G1 workload check (result not judged)"               $PY src/check_workload.py --backend ort --model $M --imgsz 320 --n 32 --out results/smoke/derived/g1.json
 step "7  choose_config (50-70% rule)"                         $PY src/choose_config.py --models "$M" --frames 30

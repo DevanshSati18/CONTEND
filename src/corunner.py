@@ -7,6 +7,8 @@ log (GB/s for bwhog, Mit/s for cpuhog), which is the independent validation used
 """
 import argparse
 import os
+import shutil
+import sys
 import signal
 import subprocess
 import time
@@ -33,7 +35,10 @@ class CoRunner(object):
                 args.append(str(self.spec.get("buffer_mb", 256)))
             log = open(os.path.join(self.log_dir, "%s_%d.log" % (self.name, i)), "w")
             self.logs.append(log)
-            self.procs.append(subprocess.Popen(["taskset", "-c", str(core)] + args, stdout=log,
+            pin = ["taskset", "-c", str(core)] if shutil.which("taskset") else []
+            if not pin and i == 0:
+                sys.stderr.write("WARNING: 'taskset' not found (macOS?) - co-runners NOT pinned to cores\n")
+            self.procs.append(subprocess.Popen(pin + args, stdout=log,
                                                stderr=subprocess.STDOUT, preexec_fn=os.setsid))
         time.sleep(3.0)                       # let it reach steady state before timing
         return self
