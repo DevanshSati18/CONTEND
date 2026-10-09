@@ -57,6 +57,8 @@ def main():
     ap.add_argument("--target-class", type=int, default=2, help="COCO class index (2=car, as in [1]); -1 = any")
     ap.add_argument("--device", default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--max-seconds", type=float, default=None,
+                    help="stop after N s and checkpoint; re-run the same command to resume (exit code 3)")
     a = ap.parse_args()
     cfg = load_config()
     ac = cfg["attack"]
@@ -70,12 +72,29 @@ def main():
     X = load_attack_frames(cfg, a.imgsz, a.limit)
     eps, steps = float(ac["eps"]), a.steps or int(ac["steps"])
     tgt = None if a.target_class < 0 else a.target_class
+    name = os.path.splitext(os.path.basename(a.model))[0]
+    out = a.out or p("perturbations/%s_%d.npy" % (name, a.imgsz))
+    ckpt = out.replace(".npy", ".ckpt.pt")
     delta = torch.zeros(1, 3, a.imgsz, a.imgsz, device=dev, requires_grad=True)
     opt = torch.optim.Adam([delta], lr=float(ac["lr"]))
     bs = min(int(ac["batch"]), len(X))
     t0 = time.time()
-    hist = []
-    for step in range(steps):
+    hist, start, spent = [], 0, 0.0
+    if os.path.exists(ckpt):                       # resume an interrupted optimisation
+        st = torch.load(ckpt, map_location=dev, weights_only=False)
+        with torch.no_grad():
+            delta.copy_(st["delta"])
+        opt.load_state_dict(st["opt"])
+        torch.set_rng_state(st["rng"])
+        hist, start, spent = st["hist"], st["step"], st["spent"]
+        print("resumed at step %d" % start)
+    for step in range(start, steps):
+        if a.max_seconds and time.time() - t0 > a.max_seconds:
+            os.makedirs(os.path.dirname(ckpt), exist_ok=True)
+            torch.save({"delta": delta.detach(), "opt": opt.state_dict(), "rng": torch.get_rng_state(),
+                        "hist": hist, "step": step, "spent": spent + time.time() - t0}, ckpt)
+            print("checkpoint at step %d/%d -> re-run to continue" % (step, steps))
+            raise SystemExit(3)
         idx = torch.randint(0, len(X), (bs,))
         x = X[idx].to(dev)
         y = model((x + delta).clamp(0, 1))
@@ -90,14 +109,14 @@ def main():
             hist.append({"step": step, "loss": float(loss), "mean_candidates": n_cand})
             print("step %4d  loss %.4f  mean candidates %.0f  (%.0fs)" % (step, float(loss), n_cand, time.time() - t0))
     d = delta.detach().cpu().numpy()[0].astype(np.float32)
-    name = os.path.splitext(os.path.basename(a.model))[0]
-    out = a.out or p("perturbations/%s_%d.npy" % (name, a.imgsz))
     os.makedirs(os.path.dirname(out), exist_ok=True)
     np.save(out, d)
     sha = hashlib.sha256(d.tobytes()).hexdigest()
     save_json({"model": a.model, "imgsz": a.imgsz, "eps": eps, "steps": steps, "target_class": tgt,
                "lambda_area": ac["lambda_area"], "lr": ac["lr"], "n_train_images": len(X),
-               "sha256": sha, "history": hist, "seconds": time.time() - t0}, out.replace(".npy", ".json"))
+               "sha256": sha, "history": hist, "seconds": spent + time.time() - t0}, out.replace(".npy", ".json"))
+    if os.path.exists(ckpt):
+        os.remove(ckpt)
     print("saved %s  sha256=%s" % (out, sha[:16]))
 
 

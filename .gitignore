@@ -18,3 +18,5 @@ paper/*.blg
 paper/*.fls
 paper/*.fdb_latexmk
 paper/*.pdf
+*.ckpt.pt
+models/yolov8s_*.onnx
