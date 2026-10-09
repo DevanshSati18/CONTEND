@@ -2,7 +2,7 @@
 
   python src/run_experiment.py g2    --backend trt --model models/yolov8n_416.engine
   python src/run_experiment.py pilot --backend trt --model models/yolov8n_416.engine
-  python src/run_experiment.py block E1 --backend trt --model models/yolov8n_416.engine
+  python src/run_experiment.py block E1 --session 2 --backend trt --model models/yolov8n_416.engine
 
 A block runs cells A (clean, no load), B (adv, no load), C (clean, load), D (adv, load)
 `runs_per_cell` times each, in a seeded random order, with a cool-down between runs.
@@ -55,10 +55,13 @@ class Runner(object):
         save_json(dict(env_info(), config=cfg, model=a.model, delta=dpath, backend=a.backend),
                   os.path.join(self.raw, "env_%s.json" % time.strftime("%Y%m%d_%H%M%S")))
 
-    def trial(self, block, cell, contention, mode, rep, order, n_frames=None, seconds=None):
+    def trial(self, block, cell, contention, mode, rep, order, n_frames=None, seconds=None, session=None):
         inp, loaded = CELLS[cell]
         cont = contention if loaded else "none"
-        run_id = "%s_%s_%s_r%02d" % (block, cell, contention, rep)
+        if session:   # main blocks: <block>_<cell>_<contention>_s<session>_r<rep>
+            run_id = "%s_%s_%s_s%d_r%02d" % (block, cell, contention, session, rep)
+        else:         # gates G2 / PILOT
+            run_id = "%s_%s_%s_r%02d" % (block, cell, contention, rep)
         out = os.path.join(self.raw, block, run_id + ".csv.gz")
         if os.path.exists(out):
             print("skip (done)", run_id)
@@ -93,7 +96,12 @@ class Runner(object):
             co.stop()
             if teg:
                 teg.terminate()
+                try:
+                    teg.wait(timeout=5)
+                except Exception:
+                    pass
             thr = CoRunner.summarize(logd, cont) if cont != "none" else []
+            gzip_logs(logd)
             self._manifest(dict(self.common, run_id=run_id, block=block, cell=cell, input=inp, contention=cont, mode=mode,
                                 rep=rep, order=order, model=self.model, start_time=t_start, start_temp_c=temp0,
                                 end_temp_c=soc_temp_c(), frames=n if status == "ok" else 0,
@@ -111,13 +119,29 @@ class Runner(object):
                 w.writeheader()
             w.writerow(row)
 
-    def block(self, name, runs=None):
+    def block(self, name, runs=None, session=1):
+        """One session of a block: `runs` runs per cell in a fresh seeded random order.
+        Sessions are independent repetitions of the whole block (different order, later time,
+        possibly after a reboot); analysis pools them and also reports them one by one."""
         b = self.cfg["experiment"]["blocks"][name]
         reps = runs or b["runs_per_cell"]
         sched = [(c, r) for c in "ABCD" for r in range(reps)]
-        random.Random(self.cfg["experiment"]["seed"] + sum(map(ord, name))).shuffle(sched)
+        random.Random(self.cfg["experiment"]["seed"] + sum(map(ord, name)) + 7919 * (session - 1)).shuffle(sched)
         for order, (cell, rep) in enumerate(sched):
-            self.trial(name, cell, b["contention"], b["mode"], rep, order)
+            self.trial(name, cell, b["contention"], b["mode"], rep, order, session=session)
+
+
+def gzip_logs(logd):
+    """Compress the per-run side logs (tegrastats at 10 Hz is ~2 MB per run) so that a device's
+    results stay small enough to commit and push."""
+    if not os.path.isdir(logd):
+        return
+    for fn in os.listdir(logd):
+        if fn.endswith(".log"):
+            src = os.path.join(logd, fn)
+            with open(src, "rb") as fi, gzip.open(src + ".gz", "wb") as fo:
+                shutil.copyfileobj(fi, fo)
+            os.remove(src)
 
 
 def g2(r, n_frames=None):
@@ -170,6 +194,7 @@ def main():
     ap.add_argument("--imgsz", type=int, default=None)
     ap.add_argument("--delta", default=None)
     ap.add_argument("--runs", type=int, default=None, help="override runs per cell")
+    ap.add_argument("--session", type=int, default=1, help="block repetition number (1, 2, 3, ...)")
     a = ap.parse_args()
     r = Runner(a)
     if a.cmd == "g2":
@@ -177,7 +202,7 @@ def main():
     elif a.cmd == "pilot":
         pilot(r, a.runs or 3)
     else:
-        r.block(a.name, a.runs)
+        r.block(a.name, a.runs, a.session)
 
 
 if __name__ == "__main__":

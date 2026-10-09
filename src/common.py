@@ -37,6 +37,19 @@ def _merge(base, over):
     return base
 
 
+def _overlay(cfg, dev, yaml, depth=0):
+    """Merge configs/devices/<dev>.yaml; an overlay may start from another one (inherit: <name>)."""
+    over = os.path.join(ROOT, "configs", "devices", dev + ".yaml")
+    if not os.path.exists(over) or depth > 3:
+        return
+    with open(over) as f:
+        y = yaml.safe_load(f) or {}
+    parent = y.pop("inherit", None)
+    if parent:
+        _overlay(cfg, parent, yaml, depth + 1)
+    _merge(cfg, y)
+
+
 def load_config(path=None):
     """Base config + device overlay configs/devices/<device>.yaml. Result paths are
     namespaced per device (results/<device>/...), so devices never overwrite each other."""
@@ -45,10 +58,13 @@ def load_config(path=None):
     with open(path) as f:
         cfg = yaml.safe_load(f)
     dev = device_id()
-    over = os.path.join(ROOT, "configs", "devices", dev + ".yaml")
-    if os.path.exists(over):
-        with open(over) as f:
-            _merge(cfg, yaml.safe_load(f) or {})
+    _overlay(cfg, dev, yaml)
+    # choices fixed ON this device by runscript.py (model/size/fps from the 50-70 % rule, runs per
+    # cell from G3). Lives with the device's results, so it is committed and pushed with them.
+    lock = os.path.join(ROOT, "results", dev, "locked_config.yaml")
+    if os.path.exists(lock) and not os.environ.get("CONTEND_NO_LOCK"):
+        with open(lock) as f:
+            _merge(cfg, (yaml.safe_load(f) or {}).get("config", {}))
     cfg["device_id"] = dev
     for k in ("raw", "derived", "figures"):
         cfg["paths"][k] = cfg["paths"][k].replace("{device}", dev)

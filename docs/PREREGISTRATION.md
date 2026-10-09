@@ -5,7 +5,9 @@ Fill the blanks after the pilot (gates G1-G3) and BEFORE the main blocks start, 
     git add configs/contend.yaml docs/PREREGISTRATION.md
     git commit -m "Pre-registration: CONTEND v1.0"
 
-The commit hash and date are cited in the paper.
+The commit hash and date are cited in the paper. With `runscript.py` the device-specific part is
+frozen automatically in `results/<device>/locked_config.yaml` (timestamp + git commit) right after
+the gates and before the first main run; copy its values into the table below.
 
 | Item | Value |
 |---|---|
@@ -21,6 +23,7 @@ The commit hash and date are cited in the paper.
 | Secondary (RQ2) | per-stage k_adv / k_clean with 95% bootstrap CI |
 | RQ3 | open-loop miss rate, absolute miss increase D-C vs B-A, drops, max consecutive misses |
 | Exclusion rules | start temperature > max_start_temp_c (waits, then logs); clocks not locked; warm-up frames |
-| Planned run counts | E1 ____ /cell, E2 ____ /cell, E3 ____ /cell, E4 (optional) ____ /cell |
+| Planned run counts | E1 ____ /cell, E2 ____ /cell, E3 ____ /cell, E4 (optional) ____ /cell (total = sessions x runs per session; see `results/<device>/locked_config.yaml`) |
+| Repetition (sessions) | ____ independent sessions per block, each in a fresh seeded random order. Primary: pooled run-level bootstrap (stratified by session). Robustness: per-session ratios, between-session SD, two-stage (session, run) bootstrap; a decision is called *robust* only if both bootstraps agree |
 
 Any later change: add a dated line to `docs/CHANGELOG.md` and report it in the paper.

@@ -25,3 +25,4 @@ data/subset_smoke/
 models_smoke/
 perturbations_smoke/
 results/smoke/
+results/smoke_rs/

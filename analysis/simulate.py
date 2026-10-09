@@ -38,29 +38,35 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--runs", type=int, default=8)
     ap.add_argument("--frames", type=int, default=800)
+    ap.add_argument("--sessions", type=int, default=1, help="independent repetitions of each block")
+    ap.add_argument("--session-drift", type=float, default=0.03,
+                    help="SD of a per-session slowdown that hits all cells alike (e.g. a warmer day)")
     a = ap.parse_args()
     rng = np.random.RandomState(7)
     for block, mode in (("E1", "closed"), ("E3", "open")):
         d = os.path.join(a.out, "raw", block)
         os.makedirs(d, exist_ok=True)
-        for cell in "ABCD":
-            for r in range(a.runs):
-                df = frames(cell, a.scenario, rng, a.frames, rng.lognormal(0, 0.01))
-                n = len(df)
-                df["latency_ms"] = df["service_ms"]
-                if mode == "open":   # simple queue: latency accumulates when service > period
-                    period, backlog, lat = 1000.0 / 30, 0.0, []
-                    for s in df["service_ms"]:
-                        backlog = max(0.0, backlog + s - period)
-                        lat.append(s + backlog)
-                    df["latency_ms"] = lat
-                df["t_release_ms"] = np.arange(n) * 1000.0 / 30
-                run_id = "%s_%s_mem_high_r%02d" % (block, cell, r)
-                df = df.assign(run_id=run_id, cell=cell, input="adv" if cell in "BD" else "clean",
-                               contention="mem_high" if cell in "CD" else "none", mode=mode, model="sim",
-                               frame_idx=np.arange(n), image_idx=np.arange(n) % 500, n_pre_nms=0, n_post_nms=0,
-                               time_limit_hit=0, queue_depth=0, dropped=0, soc_temp_c=50.0)
-                df.to_csv(os.path.join(d, run_id + ".csv"), index=False)
+        for ses in range(1, a.sessions + 1):
+            drift = rng.lognormal(0, a.session_drift) if a.sessions > 1 else 1.0
+            for cell in "ABCD":
+                for r in range(a.runs):
+                    df = frames(cell, a.scenario, rng, a.frames, drift * rng.lognormal(0, 0.01))
+                    n = len(df)
+                    df["latency_ms"] = df["service_ms"]
+                    if mode == "open":   # simple queue: latency accumulates when service > period
+                        period, backlog, lat = 1000.0 / 30, 0.0, []
+                        for s in df["service_ms"]:
+                            backlog = max(0.0, backlog + s - period)
+                            lat.append(s + backlog)
+                        df["latency_ms"] = lat
+                    df["t_release_ms"] = np.arange(n) * 1000.0 / 30
+                    run_id = ("%s_%s_mem_high_s%d_r%02d" % (block, cell, ses, r)) if a.sessions > 1 else \
+                        ("%s_%s_mem_high_r%02d" % (block, cell, r))
+                    df = df.assign(run_id=run_id, cell=cell, input="adv" if cell in "BD" else "clean",
+                                   contention="mem_high" if cell in "CD" else "none", mode=mode, model="sim",
+                                   frame_idx=np.arange(n), image_idx=np.arange(n) % 500, n_pre_nms=0, n_post_nms=0,
+                                   time_limit_hit=0, queue_depth=0, dropped=0, soc_temp_c=50.0)
+                    df.to_csv(os.path.join(d, run_id + ".csv"), index=False)
     print("simulated scenario %s -> %s/raw" % (a.scenario, a.out))
 
 

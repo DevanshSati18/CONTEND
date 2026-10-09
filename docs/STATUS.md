@@ -1,4 +1,4 @@
-# Status checkpoint — 9 Oct 2026
+# Status checkpoint — 10 Oct 2026
 
 ## Done (dev_vm = Linux arm64 VM on the Mac; development data only, never evidence)
 - Repo + multi-device pipeline committed; data format in docs/DATA_FORMAT.md.
@@ -11,18 +11,19 @@
   Stage model: measured/predicted D = 1.168 (95% CI 1.077-1.264). The excess is in the INFERENCE
   stage (C 24.1 ms vs D 29.0 ms); the NMS-stage ratio is ~1.02. Preliminary: VM, 3 runs, fixed order.
 - E1 dry run (randomised): 13 of 24 runs done; resumable.
+## Added 10 Oct
+- `runscript.py`: one command per device (`--pi`, `--nvidia`, `--dev`), resumable; `--compile` on the Mac.
+- Sessions: every block repeated in N independent sessions (default 3); repeat-aware statistics
+  (per-session ratios, between-session SD, two-stage bootstrap, robust flag) in results.json and REPORT.md.
+- Smoke test step 23 runs runscript.py end to end with 2 sessions (verified on the dev VM).
 
 ## Next
-1. Push to GitHub from the Mac Terminal:  cd ~/Development/CONTEND && gh repo create CONTEND --private --source . --push
-2. Raspberry Pi: git clone; bash scripts/40_pi_setup.sh; bash scripts/01_download_coco.sh;
-   python src/make_subset.py; bash scripts/41_pi_session.sh; python src/choose_config.py
-   -> set model/imgsz/fps in configs/devices/raspberry_pi.yaml.
-3. Pi gates: nohup bash scripts/20_run_all.sh > results/gates_raspberry_pi.log 2>&1 &
-   then fill docs/PREREGISTRATION.md, commit, nohup bash scripts/21_main_blocks.sh > results/main_raspberry_pi.log 2>&1 &
-4. Optional: finish the dev E1 dry run (resumes):
-   CONTEND_DEVICE=dev_vm python src/run_experiment.py block E1 --runs 6 --model models/yolov8n_320.onnx
-5. Jetson Nano when it arrives: README "Step 4" onward (scripts/10_nano_setup.sh).
-6. After devices push results: bash scripts/30_analyze.sh -> results/combined/.
+1. Mac: `python3 runscript.py --smoke` (expect 23/23 PASS), commit, then
+   `gh repo create CONTEND --private --source . --push`.
+2. Raspberry Pi: `git clone ...; cd CONTEND; tmux new -s contend; python3 runscript.py --pi --push-each`.
+3. Jetson Nano (after flashing + torch wheel in ~/wheels): same with `--nvidia`.
+4. Mac: `python3 runscript.py --compile` -> results/combined/REPORT.md; fill the paper TODOs.
+
 
 Watch item: check whether the inference-stage excess under memory contention reproduces on the
 Pi/Jetson with randomised order (RQ2 per-stage table: rq2_stage_sensitivity.csv, not only NMS).

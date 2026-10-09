@@ -10,36 +10,62 @@ prediction with a pre-registered ±5 % equivalence margin (frozen objective v1.0
 Target: MoSICom 2026 — submission deadline **14 Oct 2026**.
 Paper: *Does Resource Contention Amplify NMS Latency Attacks? A Controlled Factorial Study on Edge Devices*
 
-## 0. Multi-device workflow (Raspberry Pi + Jetson Nano, one repo)
+## 0. One command per device
 
-Each device clones the same repo, declares who it is in a git-ignored `.device` file, and writes
-only to `results/<device>/`. Results are committed and pushed; any machine then merges them.
+```bash
+# once, on the Mac: put the repo on GitHub (private)
+cd ~/Development/CONTEND && gh repo create CONTEND --private --source . --push
 
-| Device | `.device` | Backend | NMS | Setup | Per-session |
+# on the Raspberry Pi / Jetson Nano: clone and run everything with ONE command
+git clone https://github.com/<you>/CONTEND.git && cd CONTEND      # private repo: `gh auth login` first
+tmux new -s contend                       # keeps running if the SSH session drops (Ctrl-b d to detach)
+python3 runscript.py --pi                 # Raspberry Pi   -> results/raspberry_pi/
+python3 runscript.py --nvidia             # Jetson Nano    -> results/jetson_nano/
+python3 runscript.py --pi --status        # progress + time left, from any other terminal
+python3 runscript.py --pi --push          # same run, then commits + pushes results/raspberry_pi/
+
+# back on the Mac: pull every device's results and compile tables, figures and reports
+python3 runscript.py --compile            # results/<device>/REPORT.md + results/combined/REPORT.md
+```
+
+`runscript.py` does every step in order and skips what is already done, so **re-running the same
+command resumes** after a crash, reboot or Ctrl-C (finished runs are never repeated):
+
+| Step | What happens | Output |
+|---|---|---|
+| 1 environment | installs packages once (runs `scripts/40_pi_setup.sh` / `10_nano_setup.sh`), builds the co-runners | `.venv/` (Pi) |
+| 2 platform | performance governor / MAXN + locked clocks (asks for sudo) | – |
+| 3 images | downloads only the 500 seeded COCO evaluation images (~80 MB) | `data/coco/val2017/` |
+| 4 models | committed ONNX + perturbations; TensorRT FP16 engines on the Jetson | `models/*.engine` |
+| 5 select | 50-70 % deadline rule picks model, input size and FPS on THIS device | `locked_config.yaml` |
+| 6 gates | G1 workload, G2 contention, G3 pilot; stops if G1/G2 fail (`--force` overrides) | `derived/g1..g3` |
+| 7 main | E1-E3 repeated in `--sessions N` (default 3) independent sessions | `raw/` |
+| 8 analyse | statistics, figures and `REPORT.md`, refreshed after every session | `derived/`, `figures/` |
+
+**Why sessions (robustness).** One run's mean latency moves a little every time (thermal state,
+OS noise, memory layout), and a whole sitting can drift (a warmer room, a reboot). So the runner
+repeats every block in N independent sessions, each in a fresh seeded random order, and spreads the
+required runs per cell (max of the G3 requirement and the plan) over them, so the total time stays
+about the same. The report gives the pooled answer (pre-registered run-level bootstrap), the ratio
+of every session on its own, the between-session SD, and a two-stage bootstrap that resamples whole
+sessions; a decision is marked **robust** only if both bootstraps agree. More sessions later:
+`python3 runscript.py --pi --sessions 4` adds session 4 and keeps 1-3.
+
+Each device writes only to `results/<device>/`, so pushes from the Pi and the Jetson never conflict.
+Shared assets are made once on the Mac with `python3 runscript.py --prepare` (ONNX models and
+attack perturbations) and committed. Smoke test of the whole pipeline incl. this runner (~10 min):
+`python3 runscript.py --smoke`.
+
+| Device | `.device` | Backend | NMS | Setup (run automatically) | Per-session (run automatically) |
 |---|---|---|---|---|---|
 | Raspberry Pi (64-bit OS) | `raspberry_pi` | ONNX Runtime FP32 (CPU) | CPU | `scripts/40_pi_setup.sh` | `scripts/41_pi_session.sh` |
 | Jetson Nano (JetPack 4.6) | `jetson_nano` | TensorRT FP16 (GPU) | GPU | `scripts/10_nano_setup.sh` | `scripts/11_nano_session.sh` |
 | Mac dev VM (arm64 Linux) | `dev_vm` | ONNX Runtime FP32 | CPU | `scripts/50_dev_setup.sh` | – (development only, never evidence) |
 
-Device-specific settings (backend, cores, model size, deadline) live in `configs/devices/<device>.yaml`
-and override `configs/contend.yaml`. The data format is defined in `docs/DATA_FORMAT.md`.
+Jetson only: download NVIDIA's `torch-1.10.0-cp36-cp36m-linux_aarch64.whl` into `~/wheels/` first
+(see Step 4 below); the torchvision build in the setup takes ~45-60 min once.
 
-```bash
-# on every device
-git clone <repo-url> CONTEND && cd CONTEND
-bash scripts/40_pi_setup.sh            # or 10_nano_setup.sh on the Jetson
-bash scripts/01_download_coco.sh && python3 src/make_subset.py   # identical seeded subset everywhere
-python3 src/choose_config.py           # 50-70 % rule -> edit configs/devices/<device>.yaml
-nohup bash scripts/20_run_all.sh  > results/gates_$(cat .device).log 2>&1 &   # G1-G3
-nohup bash scripts/21_main_blocks.sh > results/main_$(cat .device).log 2>&1 &  # E1-E3
-git add results/$(cat .device) configs/devices && git commit -m "results: $(cat .device)" && git pull --rebase && git push
-# on any machine, after pulling everyone's results
-bash scripts/30_analyze.sh             # per-device stats + results/combined/ + fig5
-```
-Shared assets made once on the dev machine and committed: `data/subset/*.txt`,
-`models/*.onnx` (yolov8n), `perturbations/*.npy` (+ sha256 json). The Pi and Jetson rebuild the
-frame caches from their own COCO copy using the same image IDs.
-
+The numbered scripts below still work step by step; `runscript.py` simply calls them in order.
 
 ---
 
@@ -48,6 +74,7 @@ frame caches from their own COCO copy using the same image IDs.
 ```
 CONTEND/
 ├── README.md                    this file: structure, commands, 6-day plan
+├── runscript.py                 ONE command per device: --pi / --nvidia / --dev / --compile
 ├── requirements-host.txt        Python packages for the host PC
 ├── configs/
 │   └── contend.yaml             single source of truth (model, NMS, attack, co-runners, blocks)
@@ -79,7 +106,9 @@ CONTEND/
 ├── analysis/
 │   ├── summarize.py             per-run summaries (the run is the unit, not the frame)
 │   ├── analyze.py               RQ1 prediction test, RQ2 per-stage k, RQ3 deadlines, figures
-│   └── simulate.py              synthetic logs with known answers (validates the analysis)
+│   ├── simulate.py              synthetic logs with known answers (validates the analysis)
+│   ├── combine.py               all devices -> results/combined/
+│   └── report.py                REPORT.md per device and combined
 ├── tests/test_nms.py            vendored NMS == Ultralytics NMS (20/20 identical)
 ├── paper/
 │   ├── main.tex                 IEEE conference draft (Intro, Related Work, Method written)
@@ -237,9 +266,9 @@ Run `python3 src/harness.py --backend trt --model models/<name>.engine --mode cl
 ```bash
 bash scripts/smoke_test.sh        # prints a PASS/FAIL table, writes results/smoke/SMOKE_REPORT.md
 ```
-Runs all 22 stages with tiny settings (`configs/devices/smoke.yaml`): 128-image COCO sample
+Runs all 23 stages with tiny settings (`configs/devices/smoke.yaml`): 128-image COCO sample
 (auto-downloaded), 32-image subset, 20-step attack, 60-frame runs, 2 runs per cell, gates G1-G3,
 blocks E1-E3, resume check, analysis, both synthetic validation scenarios, cross-device combine,
-and a schema check. Fully isolated (`results/smoke/`, `*_smoke/`); its numbers are meaningless.
+a schema check, and `runscript.py` itself with 2 sessions (`results/smoke_rs/`). Fully isolated (`results/smoke/`, `*_smoke/`); its numbers are meaningless.
 Run it first on every new device (Raspberry Pi, Jetson) before the real gates. The full study
 uses the same code with the real settings: 300 attack steps, 500 images, 3000-frame runs.

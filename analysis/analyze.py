@@ -37,25 +37,59 @@ NICE = {"mem_high": "Memory BW (high)", "mem_low": "Memory BW (low)", "cpu": "CP
 
 
 def cell_means(d):
-    """dict cell -> DataFrame of per-run stage means for one block."""
-    return {c: d[d["cell"] == c][STAGES].reset_index(drop=True) for c in "ABCD"}
+    """dict cell -> DataFrame of per-run stage means (+ session) for one block."""
+    if "session" not in d:
+        d = d.assign(session=1)
+    return {c: d[d["cell"] == c][STAGES + ["session"]].reset_index(drop=True) for c in "ABCD"}
+
+
+def tot(x):
+    """Per-run total of the stage times."""
+    return x[STAGES].sum(axis=1)
 
 
 def stat_R(cm):
-    mA, mB, mC, mD = (cm[c].mean() for c in "ABCD")
+    mA, mB, mC, mD = (cm[c][STAGES].mean() for c in "ABCD")
     k = (mC / mA).replace([np.inf], np.nan).fillna(1.0)
     pred = float((k * mB).sum())
     meas = float(mD.sum())
     return np.log(meas / pred), meas, pred, k
 
 
-def boot(cm, fn, n, seed):
+def boot(cm, fn, n, seed, cluster=False):
+    """Run-level bootstrap, stratified by cell AND session (each session keeps its own runs),
+    which equals the pre-registered run-level bootstrap when there is one session.
+    cluster=True: two-stage bootstrap - resample whole sessions first, then runs inside them.
+    It carries the session-to-session variation into the CI (conservative robustness check)."""
     rng = np.random.RandomState(seed)
+    sess = sorted(set().union(*[set(cm[c]["session"]) for c in "ABCD"]))
+    idx = {c: {s: np.where(cm[c]["session"].values == s)[0] for s in sess} for c in "ABCD"}
     out = []
     for _ in range(n):
-        s = {c: cm[c].iloc[rng.randint(0, len(cm[c]), len(cm[c]))] for c in "ABCD"}
-        out.append(fn(s))
+        pick = [sess[i] for i in rng.randint(0, len(sess), len(sess))] if cluster else sess
+        smp = {}
+        for c in "ABCD":
+            parts = [idx[c][s][rng.randint(0, len(idx[c][s]), len(idx[c][s]))] for s in pick if len(idx[c][s])]
+            smp[c] = cm[c].iloc[np.concatenate(parts)]
+        out.append(fn(smp))
     return np.array(out)
+
+
+def decide(tost, two, m):
+    if -m < tost[0] and tost[1] < m:
+        return "H0: predictable (equivalent within margin)"
+    if two[0] > m:
+        return "H1: amplified beyond prediction"
+    if two[1] < -m:
+        return "below prediction"
+    return "inconclusive"
+
+
+def r_test(cm, nboot, seed, a_adj, m, cluster=False):
+    bs = boot(cm, lambda s: stat_R(s)[0], nboot, seed, cluster)
+    tost = np.percentile(bs, [100 * a_adj, 100 * (1 - a_adj)])
+    two = np.percentile(bs, [100 * a_adj / 2, 100 * (1 - a_adj / 2)])
+    return tost, two, decide(tost, two, m)
 
 
 def rq1_rq2(df, cfg, nboot):
@@ -71,26 +105,20 @@ def rq1_rq2(df, cfg, nboot):
             print("block %s: fewer than 2 runs in a cell, skipped" % b)
             continue
         R, meas, pred, k = stat_R(cm)
-        bs = boot(cm, lambda s: stat_R(s)[0], nboot, 1)
-        tost = np.percentile(bs, [100 * a_adj, 100 * (1 - a_adj)])
-        two = np.percentile(bs, [100 * a_adj / 2, 100 * (1 - a_adj / 2)])
-        if -m < tost[0] and tost[1] < m:
-            dec = "H0: predictable (equivalent within margin)"
-        elif two[0] > m:
-            dec = "H1: amplified beyond prediction"
-        elif two[1] < -m:
-            dec = "below prediction"
-        else:
-            dec = "inconclusive"
-        mA, mB, mC, mD = (cm[c].sum(axis=1).mean() for c in "ABCD")
-        it = boot(cm, lambda s: s["D"].sum(axis=1).mean() - s["B"].sum(axis=1).mean() - s["C"].sum(axis=1).mean() + s["A"].sum(axis=1).mean(),
+        tost, two, dec = r_test(cm, nboot, 1, a_adj, m)
+        mA, mB, mC, mD = (tot(cm[c]).mean() for c in "ABCD")
+        it = boot(cm, lambda s: tot(s["D"]).mean() - tot(s["B"]).mean() - tot(s["C"]).mean() + tot(s["A"]).mean(),
                   nboot, 2)
-        res1.append(dict(block=b, contention=d["contention"].iloc[0], runs_per_cell=min(len(cm[c]) for c in "ABCD"),
-                         T_A=mA, T_B=mB, T_C=mC, T_D=mD, T_D_pred=pred, ratio=float(np.exp(R)),
-                         ratio_ci_tost=[float(np.exp(tost[0])), float(np.exp(tost[1]))],
-                         ratio_ci_two_sided=[float(np.exp(two[0])), float(np.exp(two[1]))],
-                         margin=cfg["analysis"]["equivalence_margin"], alpha_adj=a_adj, decision=dec,
-                         I_T_ms=mD - mB - mC + mA, I_T_ci95=[float(np.percentile(it, 2.5)), float(np.percentile(it, 97.5))]))
+        row = dict(block=b, contention=d["contention"].iloc[0], runs_per_cell=min(len(cm[c]) for c in "ABCD"),
+                   T_A=mA, T_B=mB, T_C=mC, T_D=mD, T_D_pred=pred, ratio=float(np.exp(R)),
+                   ratio_ci_tost=[float(np.exp(tost[0])), float(np.exp(tost[1]))],
+                   ratio_ci_two_sided=[float(np.exp(two[0])), float(np.exp(two[1]))],
+                   margin=cfg["analysis"]["equivalence_margin"], alpha_adj=a_adj, decision=dec,
+                   I_T_ms=mD - mB - mC + mA, I_T_ci95=[float(np.percentile(it, 2.5)), float(np.percentile(it, 97.5))])
+        row.update(session_robustness(cm, nboot, a_adj, m))
+        if row["decision_cluster"] is not None:
+            row["robust_across_sessions"] = bool(row["decision_cluster"] == dec)
+        res1.append(row)
         for s in STAGES:
             def ks(sm, s=s):
                 kc = sm["C"][s].mean() / sm["A"][s].mean()
@@ -101,8 +129,37 @@ def rq1_rq2(df, cfg, nboot):
             ci = np.nanpercentile(bb, [2.5, 97.5], axis=0)
             res2.append(dict(block=b, contention=d["contention"].iloc[0], stage=s, k_clean=pt[0], k_adv=pt[1],
                              k_ratio=pt[2], k_clean_ci=list(ci[:, 0]), k_adv_ci=list(ci[:, 1]),
-                             k_ratio_ci=list(ci[:, 2]), share_B=float(cm["B"][s].mean() / cm["B"].sum(axis=1).mean())))
+                             k_ratio_ci=list(ci[:, 2]), share_B=float(cm["B"][s].mean() / tot(cm["B"]).mean())))
     return res1, res2, blocks
+
+
+def session_robustness(cm, nboot, a_adj, m):
+    """Repeatability across independent sessions of the same block:
+    - the ratio and its CI in every complete session on its own,
+    - the between-session SD of log R (how much the answer moves from one session to the next),
+    - a two-stage (session, then run) bootstrap CI and the decision it gives,
+    - robust = the pooled decision does not change under the two-stage bootstrap."""
+    sess = sorted(set().union(*[set(cm[c]["session"]) for c in "ABCD"]))
+    full = [s for s in sess if all((cm[c]["session"] == s).sum() >= 2 for c in "ABCD")]
+    out = dict(n_sessions=len(sess), sessions_complete=full, ratio_by_session=[], ratio_ci_by_session=[],
+               decision_by_session=[], between_session_sd_pct=None, ratio_ci_cluster=None,
+               decision_cluster=None, robust_across_sessions=None)
+    logs = []
+    for s in full:
+        sub = {c: cm[c][cm[c]["session"] == s].reset_index(drop=True) for c in "ABCD"}
+        Rs = stat_R(sub)[0]
+        tost, two, dec = r_test(sub, max(1000, nboot // 5), 11 + s, a_adj, m)
+        logs.append(Rs)
+        out["ratio_by_session"].append(float(np.exp(Rs)))
+        out["ratio_ci_by_session"].append([float(np.exp(two[0])), float(np.exp(two[1]))])
+        out["decision_by_session"].append(dec)
+    if len(logs) >= 2:
+        out["between_session_sd_pct"] = float(100 * np.std(logs, ddof=1))
+        sub = {c: cm[c][cm[c]["session"].isin(full)].reset_index(drop=True) for c in "ABCD"}
+        tost, two, dec = r_test(sub, nboot, 5, a_adj, m, cluster=True)
+        out["ratio_ci_cluster"] = [float(np.exp(two[0])), float(np.exp(two[1]))]
+        out["decision_cluster"] = dec
+    return out
 
 
 def regression(df):
@@ -117,6 +174,8 @@ def regression(df):
         d["adv"] = (d["input"] == "adv").astype(int)
         d["load"] = d["cell"].isin(["C", "D"]).astype(int)
         terms = "adv * load"
+        if "session" in d and d["session"].nunique() > 1:
+            terms += " + C(session)"
         if "order" in d and d["order"].notna().all():
             terms += " + order"
         if "start_temp_c" in d and d["start_temp_c"].notna().all() and d["start_temp_c"].std() > 0:
@@ -136,6 +195,7 @@ def rq3(df, nboot):
             continue
         for c in "ABCD":
             rows.append(dict(block=b, contention=d["contention"].iloc[0], cell=c, runs=len(cm[c]),
+                             sessions=int(cm[c]["session"].nunique()) if "session" in cm[c] else 1,
                              miss_rate=float(cm[c]["miss_rate"].mean()), drop_rate=float(cm[c]["drop_rate"].mean()),
                              max_consec_miss=float(cm[c]["max_consec_miss"].mean()),
                              tard_p95_ms=float(cm[c]["tard_p95_ms"].mean()), lat_p99=float(cm[c]["lat_p99"].mean())))
@@ -160,17 +220,22 @@ def figures(r1, r2, figdir, raw):
     os.makedirs(figdir, exist_ok=True)
     W = 3.5   # IEEE single column (inches)
     if r1:   # Fig. 2: measured / predicted with CIs and the equivalence band
-        fig, ax = plt.subplots(figsize=(W, 0.45 + 0.35 * len(r1)))
+        fig, ax = plt.subplots(figsize=(W, 0.75 + 0.4 * len(r1)))
         m = r1[0]["margin"]
         ax.axvspan(1 - m, 1 + m, color="#e9e9e6", zorder=0, lw=0)
         ax.axvline(1, color="#888", lw=0.6, zorder=1)
         for i, r in enumerate(r1):
             lo, hi = r["ratio_ci_two_sided"]
             ax.plot([lo, hi], [i, i], color="#222", lw=1.2, solid_capstyle="round")
-            ax.plot(r["ratio"], i, "o", ms=5, color="#222", mec="white", mew=1)
+            ax.plot(r["ratio"], i, "o", ms=5, color="#222", mec="white", mew=1, zorder=3)
+            if r.get("ratio_ci_cluster"):   # two-stage (session-level) CI, thin and offset
+                ax.plot(r["ratio_ci_cluster"], [i - 0.18] * 2, color="#888", lw=0.8)
+            sr = r.get("ratio_by_session") or []
+            if len(sr) > 1:                 # each independent session on its own
+                ax.plot(sr, [i + 0.18] * len(sr), "|", ms=6, mew=1.0, color=ADV)
         ax.set_yticks(range(len(r1)))
         ax.set_yticklabels([NICE.get(r["contention"], r["contention"]) for r in r1])
-        ax.set_xlabel("Measured / predicted latency of cell D (95% CI)")
+        ax.set_xlabel("Measured / predicted latency, cell D")
         ax.text(1 + m, len(r1) - 0.4, " ±%d%% band" % round(100 * m), fontsize=7, color="#555", va="center")
         ax.set_ylim(-0.6, len(r1) - 0.2)
         fig.tight_layout()
@@ -263,6 +328,12 @@ def main():
         print("  %-9s  runs/cell %d  T_D %.2f ms  predicted %.2f ms  ratio %.3f  95%% CI %.3f-%.3f  -> %s" % (
             r["contention"], r["runs_per_cell"], r["T_D"], r["T_D_pred"], r["ratio"],
             r["ratio_ci_two_sided"][0], r["ratio_ci_two_sided"][1], r["decision"]))
+        if r.get("n_sessions", 1) > 1:
+            print("             sessions %d: ratio %s; between-session SD %s; two-stage CI %s -> %s; robust: %s" % (
+                r["n_sessions"], ", ".join("%.3f" % v for v in r["ratio_by_session"]),
+                ("%.2f%%" % r["between_session_sd_pct"]) if r["between_session_sd_pct"] is not None else "n/a",
+                ("%.3f-%.3f" % tuple(r["ratio_ci_cluster"])) if r["ratio_ci_cluster"] else "n/a",
+                r["decision_cluster"] or "n/a", r["robust_across_sessions"]))
         print("             (additive interaction I_T %+.2f ms, 95%% CI %+.2f to %+.2f; positive by construction under"
               " proportional slowdown)" % (r["I_T_ms"], r["I_T_ci95"][0], r["I_T_ci95"][1]))
     print("\nRQ2  NMS-stage contention sensitivity (adv / clean)")

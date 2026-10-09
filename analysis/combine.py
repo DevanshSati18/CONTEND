@@ -49,7 +49,14 @@ def main():
                             T_A_ms=x["T_A"], T_B_ms=x["T_B"], T_C_ms=x["T_C"], T_D_ms=x["T_D"],
                             T_D_pred_ms=x["T_D_pred"], ratio=x["ratio"],
                             ratio_ci_lo=x["ratio_ci_two_sided"][0], ratio_ci_hi=x["ratio_ci_two_sided"][1],
-                            decision=x["decision"], I_T_ms=x["I_T_ms"]))
+                            decision=x["decision"], I_T_ms=x["I_T_ms"],
+                            n_sessions=x.get("n_sessions", 1),
+                            ratio_by_session=";".join("%.4f" % v for v in x.get("ratio_by_session", [])),
+                            between_session_sd_pct=x.get("between_session_sd_pct"),
+                            ratio_ci_cluster_lo=(x.get("ratio_ci_cluster") or [None, None])[0],
+                            ratio_ci_cluster_hi=(x.get("ratio_ci_cluster") or [None, None])[1],
+                            decision_cluster=x.get("decision_cluster"),
+                            robust_across_sessions=x.get("robust_across_sessions")))
         for x in r.get("rq2", []):
             if x["stage"] == "t_nms_ms":
                 rq2.append(dict(meta, contention=x["contention"], k_clean=x["k_clean"], k_adv=x["k_adv"],
@@ -65,8 +72,8 @@ def main():
     pd.DataFrame(rq2).to_csv(os.path.join(out, "contend_rq2_nms.csv"), index=False)
     pd.DataFrame(rq3).to_csv(os.path.join(out, "contend_rq3.csv"), index=False)
     print("devices: %s" % sorted(set(x["device_id"] for x in rq1)))
-    print(pd.DataFrame(rq1)[["device_id", "contention", "runs_per_cell", "ratio", "ratio_ci_lo", "ratio_ci_hi",
-                             "decision"]].to_string(index=False) if rq1 else "no RQ1 results yet")
+    print(pd.DataFrame(rq1)[["device_id", "contention", "n_sessions", "runs_per_cell", "ratio", "ratio_ci_lo",
+                             "ratio_ci_hi", "decision", "robust_across_sessions"]].to_string(index=False) if rq1 else "no RQ1 results yet")
     figure(pd.DataFrame(rq1), out)
 
 

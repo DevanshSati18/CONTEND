@@ -6,11 +6,14 @@ the same git repo without conflicts. Results are committed to git (gzip CSV, a f
 ```
 results/
 ├── <device_id>/                 jetson_nano | raspberry_pi | dev_vm
+│   ├── locked_config.yaml       model/size/FPS + runs per session, frozen by runscript.py before E1
+│   ├── REPORT.md                human-readable summary, rebuilt after every session
+│   ├── logs/runscript_*.log     full console log of every runscript.py invocation
 │   ├── raw/
 │   │   ├── runs.csv             manifest: one row per run (all blocks, incl. failed/interrupted)
 │   │   ├── env_<timestamp>.json software/hardware versions + full resolved config per session
 │   │   └── <block>/<run_id>.csv.gz      per-frame records (table A)
-│   │       <block>/<run_id>_logs/       co-runner throughput logs, tegrastats (Jetson)
+│   │       <block>/<run_id>_logs/       co-runner throughput + tegrastats logs (*.log.gz)
 │   ├── derived/
 │   │   ├── g1_device.json g2.json g3.json choose_config.json   gate results
 │   │   ├── run_summary.csv      one row per run (table B) - the experimental unit
@@ -20,10 +23,13 @@ results/
 └── combined/                    built by analysis/combine.py from all devices
     ├── contend_runs.csv         table B for all devices + device_label, platform_class, deadline_ms
     ├── contend_rq1.csv contend_rq2_nms.csv contend_rq3.csv
-    └── fig5_cross_device_rq1.pdf
+    ├── fig5_cross_device_rq1.pdf
+    └── REPORT.md
 ```
 
-`run_id` = `<block>_<cell>_<contention>_r<rep>`; it is unique within a device. The global key is
+`run_id` = `<block>_<cell>_<contention>_s<session>_r<rep>` for the main blocks (gates: no `_s<k>`).
+A **session** is one complete, independently randomised repetition of a block (`--sessions N`);
+runs without `_s<k>` count as session 1. `run_id` is unique within a device; the global key is
 (`device_id`, `run_id`).
 
 ## Table A — per-frame record (`raw/<block>/<run_id>.csv.gz`)
@@ -55,7 +61,13 @@ Device fields as in table A, plus: 5 %-trimmed means of every stage, `service_ms
 `other_ms` (service minus stages), `lat_p50/p95/p99`, `n_pre_nms`, `n_post_nms`, `frames`,
 `miss_rate` (latency > deadline or dropped), `drop_rate`, `max_consec_miss`, `tard_p95_ms`,
 `queue_mean`, `temp_mean_c`, `time_limit_hits`, `order` (randomised position), `start_temp_c`,
-and `contention` = the block's co-runner type.
+`session` (from the run id), and `contention` = the block's co-runner type.
+
+## Repeat-aware statistics (`results.json` → `rq1[]`)
+Pooled over sessions (primary, as pre-registered): `ratio`, `ratio_ci_two_sided`, `decision`.
+Repeatability: `n_sessions`, `ratio_by_session`, `ratio_ci_by_session`, `decision_by_session`,
+`between_session_sd_pct` (SD of log R across sessions, in %), `ratio_ci_cluster` + `decision_cluster`
+(two-stage bootstrap: sessions, then runs), `robust_across_sessions` (pooled and two-stage decisions agree).
 
 ## Rules
 * Never edit files in `raw/`. Re-analysis always starts from `raw/`.

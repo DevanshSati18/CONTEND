@@ -1,0 +1,4 @@
+# Self-test of runscript.py (used by scripts/smoke_test.sh, step 23): the smoke settings, run
+# through the one-command runner with 2 sessions, into results/smoke_rs/. Numbers mean nothing.
+inherit: smoke
+device_label: "runscript.py self-test (tiny settings; code check only)"

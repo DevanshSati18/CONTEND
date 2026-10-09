@@ -32,7 +32,7 @@ fi
 echo "Python: $(command -v $PY) ($($PY -c 'import sys;print(sys.version.split()[0])'))"
 command -v taskset >/dev/null || echo "NOTE: no 'taskset' (macOS): runs are not pinned to cores - fine for a smoke test, not for real data."
 LOG=results/smoke/smoke.log
-[ "${KEEP:-0}" = 1 ] || rm -rf results/smoke data/subset_smoke perturbations_smoke
+[ "${KEEP:-0}" = 1 ] || rm -rf results/smoke results/smoke_rs data/subset_smoke perturbations_smoke
 mkdir -p results/smoke
 : > "$LOG"
 declare -a NAMES STATUS
@@ -81,6 +81,7 @@ step "19 analysis validation: proportional -> H0"             bash -c "$PY analy
 step "20 analysis validation: planted +40% NMS -> H1"         bash -c "$PY analysis/simulate.py --scenario h1 --out results/smoke/sim_h1 --runs 6 --frames 200 && $PY analysis/summarize.py --raw results/smoke/sim_h1/raw --out results/smoke/sim_h1/s.csv && $PY analysis/analyze.py --summary results/smoke/sim_h1/s.csv --outdir results/smoke/sim_h1 --figdir results/smoke/sim_h1/fig --nboot 300 | grep -q 'H1: amplified'"
 step "21 combine all devices (smoke excluded from fig)"       $PY analysis/combine.py
 step "22 output files present + schema check"                $PY tests/check_outputs.py results/smoke
+step "23 runscript.py end to end, 2 sessions (resumable)"    bash -c "CONTEND_PYTHON=$PY $PY runscript.py --profile smoke_rs --sessions 2 --skip-platform --no-setup --force && $PY tests/check_runscript.py results/smoke_rs"
 
 {
   echo "# CONTEND smoke test — $(date '+%Y-%m-%d %H:%M')"

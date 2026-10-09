@@ -9,6 +9,7 @@ misses, P95 tardiness, mean queue depth.
 import argparse
 import glob
 import os
+import re
 import sys
 
 import numpy as np
@@ -27,6 +28,12 @@ def max_run(mask):
         cur = cur + 1 if v else 0
         best = max(best, cur)
     return best
+
+
+def session_of(run_id):
+    """Block repetition number from the run id (<block>_<cell>_<cont>_s<k>_r<rep>); 1 if absent."""
+    m = re.search(r"_s(\d+)_r\d+$", str(run_id))
+    return int(m.group(1)) if m else 1
 
 
 def summarize_run(df, deadline_ms, trim):
@@ -71,7 +78,8 @@ def main():
         row = dict(schema_version=r0.get("schema_version", ""), device_id=r0.get("device_id", cfg["device_id"]),
                    backend=r0.get("backend", ""), precision=r0.get("precision", ""), imgsz=r0.get("imgsz", ""),
                    fps_target=r0.get("fps_target", cfg["deadline"]["fps"]), run_id=r0["run_id"], block=block, cell=r0["cell"], input=r0["input"],
-                   contention_run=r0["contention"], mode=r0["mode"], model=r0["model"])
+                   contention_run=r0["contention"], mode=r0["mode"], model=r0["model"],
+                   session=session_of(r0["run_id"]))
         row.update(summarize_run(df, deadline, cfg["analysis"]["trim"]))
         rows.append(row)
     out = pd.DataFrame(rows)
