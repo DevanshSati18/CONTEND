@@ -129,9 +129,14 @@ def g2(r, n_frames=500):
         load = r.trial("G2", "C", name, "closed", 0, 1, n_frames=n_frames)
         tb = pd.read_csv(base)["latency_ms"].mean()
         tl = pd.read_csv(load)["latency_ms"].mean()
-        res[name] = dict(clean_ms=tb, loaded_ms=tl, slowdown=tl / tb - 1, G2_pass=bool(tl / tb - 1 >= 0.10))
-        print("G2 %-8s clean %.2f ms -> loaded %.2f ms  (+%.1f%%)  %s" %
-              (name, tb, tl, 100 * (tl / tb - 1), "PASS" if tl / tb - 1 >= 0.10 else "FAIL"))
+        kind = r.cfg["contention"][name]["kind"]
+        ok = bool(tl / tb - 1 >= 0.10)
+        # bandwidth co-runners must load the detector; the CPU co-runner is the CONTROL
+        # (separates DRAM contention from CPU scheduling), so its slowdown is only reported.
+        verdict = ("PASS" if ok else "FAIL") if kind == "bw" else "CONTROL (reported, no threshold)"
+        res[name] = dict(kind=kind, clean_ms=tb, loaded_ms=tl, slowdown=tl / tb - 1,
+                         G2_pass=ok if kind == "bw" else None)
+        print("G2 %-8s clean %.2f ms -> loaded %.2f ms  (%+.1f%%)  %s" % (name, tb, tl, 100 * (tl / tb - 1), verdict))
     save_json(res, os.path.join(p(r.cfg["paths"]["derived"]), "g2.json"))
 
 

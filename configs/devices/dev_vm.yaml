@@ -5,5 +5,6 @@ platform_class: dev
 runtime: {backend: ort, model_ext: onnx, precision: fp32}
 nms: {device: cpu}
 platform: {detector_cores: [0, 1], corunner_cores: [2, 3], max_start_temp_c: 200, cooldown_s: 5}
-deadline: {fps: 15}
+deadline: {fps: 30}
 model: {name: yolov8n, imgsz: 320}
+stream: {closed_frames: 1500, open_seconds: 60}
