@@ -17,3 +17,16 @@ schema_version,device_id,backend,precision,imgsz,fps_target,run_id,block,cell,in
 1.0,dev_vm,ort,fp32,320,30,PILOT_D_mem_high_r00,PILOT,D,adv,mem_high,closed,0,0,yolov8n_320.onnx,2026-10-09T14:11:52,nan,nan,1000,35.488;35.524,ok
 1.0,dev_vm,ort,fp32,320,30,PILOT_D_mem_high_r01,PILOT,D,adv,mem_high,closed,1,0,yolov8n_320.onnx,2026-10-09T14:12:41,nan,nan,1000,32.059;32.054,ok
 1.0,dev_vm,ort,fp32,320,30,PILOT_D_mem_high_r02,PILOT,D,adv,mem_high,closed,2,0,yolov8n_320.onnx,2026-10-09T14:13:34,nan,nan,1000,32.689;32.720,ok
+1.0,dev_vm,ort,fp32,320,30,E1_B_mem_high_r00,E1,B,adv,none,closed,0,0,yolov8n_320.onnx,2026-10-09T14:15:04,nan,nan,1500,,ok
+1.0,dev_vm,ort,fp32,320,30,E1_B_mem_high_r05,E1,B,adv,none,closed,5,1,yolov8n_320.onnx,2026-10-09T14:15:39,nan,nan,1500,,ok
+1.0,dev_vm,ort,fp32,320,30,E1_C_mem_high_r04,E1,C,clean,mem_high,closed,4,2,yolov8n_320.onnx,2026-10-09T14:16:18,nan,nan,1500,35.393;35.609,ok
+1.0,dev_vm,ort,fp32,320,30,E1_B_mem_high_r02,E1,B,adv,none,closed,2,3,yolov8n_320.onnx,2026-10-09T14:17:38,nan,nan,1500,,ok
+1.0,dev_vm,ort,fp32,320,30,E1_C_mem_high_r03,E1,C,clean,mem_high,closed,3,4,yolov8n_320.onnx,2026-10-09T14:18:21,nan,nan,1500,27.853;27.828,ok
+1.0,dev_vm,ort,fp32,320,30,E1_A_mem_high_r04,E1,A,clean,none,closed,4,5,yolov8n_320.onnx,2026-10-09T14:19:35,nan,nan,1500,,ok
+1.0,dev_vm,ort,fp32,320,30,E1_D_mem_high_r04,E1,D,adv,mem_high,closed,4,6,yolov8n_320.onnx,2026-10-09T14:20:27,nan,nan,1500,28.509;28.591,ok
+1.0,dev_vm,ort,fp32,320,30,E1_C_mem_high_r02,E1,C,clean,mem_high,closed,2,7,yolov8n_320.onnx,2026-10-09T14:21:46,nan,nan,1500,33.412;33.373,ok
+1.0,dev_vm,ort,fp32,320,30,E1_C_mem_high_r05,E1,C,clean,mem_high,closed,5,8,yolov8n_320.onnx,2026-10-09T14:23:17,nan,nan,1500,37.112;37.163,ok
+1.0,dev_vm,ort,fp32,320,30,E1_A_mem_high_r02,E1,A,clean,none,closed,2,9,yolov8n_320.onnx,2026-10-09T14:24:14,nan,nan,1500,,ok
+1.0,dev_vm,ort,fp32,320,30,E1_B_mem_high_r01,E1,B,adv,none,closed,1,10,yolov8n_320.onnx,2026-10-09T14:24:48,nan,nan,1500,,ok
+1.0,dev_vm,ort,fp32,320,30,E1_D_mem_high_r00,E1,D,adv,mem_high,closed,0,11,yolov8n_320.onnx,2026-10-09T14:26:11,nan,nan,1500,34.732;34.876,ok
+1.0,dev_vm,ort,fp32,320,30,E1_D_mem_high_r05,E1,D,adv,mem_high,closed,5,12,yolov8n_320.onnx,2026-10-09T14:27:16,nan,nan,1500,29.069;28.371,ok
