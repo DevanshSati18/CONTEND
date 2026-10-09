@@ -1,0 +1,84 @@
+# CONTEND — CONTention x adversarial Evaluation of NMS Deadlines
+# Single source of truth for every experiment. Commit this file before the main runs
+# (pre-registration) and do not edit it afterwards without a dated note in docs/CHANGELOG.md.
+
+project: CONTEND
+version: "1.0"
+
+paths:
+  coco_images: data/coco/val2017
+  coco_annotations: data/coco/annotations/instances_val2017.json
+  subset_ids: data/subset/image_ids.txt
+  subset_cache: data/subset/frames_{imgsz}.npy   # pre-letterboxed uint8 frames
+  models: models
+  perturbations: perturbations
+  raw: results/{device}/raw          # {device} = device_id (configs/devices/<device>.yaml)
+  derived: results/{device}/derived
+  figures: results/{device}/figures
+
+subset:
+  n_images: 500          # fixed evaluation subset (seeded)
+  n_attack_train: 200    # images used to optimise the universal perturbation
+  seed: 20261009
+
+runtime:                 # overridden per device in configs/devices/<device>.yaml
+  backend: trt           # trt (Jetson) | ort (Raspberry Pi / dev VM / host)
+  model_ext: engine      # engine | onnx
+  precision: fp16
+
+model:
+  name: yolov8n          # fixed in P0 by the 50-70% rule (yolov8n or yolov8s)
+  imgsz: 416             # fixed in P0 by the 50-70% rule (640 / 416 / 320)
+  precision: fp16        # TensorRT engine precision on the board
+
+nms:                     # Ultralytics predictor defaults (EVADE-compliant)
+  conf_thres: 0.25
+  iou_thres: 0.7
+  max_det: 300
+  max_nms: 30000
+  agnostic: false
+  time_limit_s: 2.05     # Ultralytics runtime guard (2.0 + 0.05 * batch); logged when hit
+  device: null           # null = same device as inference (GPU on the Nano). Pre-planned
+                         # fallback if G1 fails on GPU: 'cpu' (EVADE: CPU NMS is where attacks bite)
+
+attack:                  # re-implementation of the Phantom Sponges max-objects objective [1]
+  eps: 0.0627            # L-infinity budget = 16/255 on the [0,1] network input
+  steps: 300
+  batch: 8
+  lr: 0.01
+  lambda_area: 10.0      # bounding-box area loss weight (Phantom Sponges)
+  target_conf: 0.25      # push candidate scores just above conf_thres
+
+deadline:
+  fps: 30                # 30 FPS if clean latency allows, else 15 (set in P0)
+
+stream:
+  queue_len: 4           # bounded frame queue for open-loop runs (drop-oldest)
+  warmup_frames: 300
+  closed_frames: 3000
+  open_seconds: 300
+
+platform:
+  detector_cores: [0, 1]
+  corunner_cores: [2, 3]
+  cooldown_s: 120
+  max_start_temp_c: 55   # skip/repeat a run if the SoC starts hotter than this
+
+contention:              # co-runner definitions (validated in gate G2)
+  none: {kind: none}
+  mem_low:  {kind: bw,  instances: 1, buffer_mb: 256}
+  mem_high: {kind: bw,  instances: 2, buffer_mb: 256}
+  cpu:      {kind: cpu, instances: 2}
+
+experiment:              # compressed plan for the 14 Oct deadline
+  seed: 20261011
+  blocks:
+    E1: {mode: closed, contention: mem_high, runs_per_cell: 8}
+    E2: {mode: closed, contention: cpu,      runs_per_cell: 8}
+    E3: {mode: open,   contention: mem_high, runs_per_cell: 4}
+    E4: {mode: closed, contention: mem_low,  runs_per_cell: 6}   # optional, overnight
+
+analysis:
+  equivalence_margin: 0.05   # +/-5 % on the measured/predicted latency ratio (pre-registered)
+  bootstrap: 10000
+  trim: 0.05

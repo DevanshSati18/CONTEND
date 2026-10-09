@@ -1,0 +1,9 @@
+# Raspberry Pi (64-bit Raspberry Pi OS): CPU-only, ONNX Runtime FP32, NMS on CPU.
+# Detector on cores 0-1 (2 ORT threads); co-runners on cores 2-3 share L2 + DRAM.
+device_label: "Raspberry Pi (model set by scripts/40_pi_setup.sh), 4x Cortex-A CPU"
+platform_class: edge_cpu
+runtime: {backend: ort, model_ext: onnx, precision: fp32}
+nms: {device: cpu}
+platform: {detector_cores: [0, 1], corunner_cores: [2, 3], max_start_temp_c: 65}
+deadline: {fps: 5}          # provisional: set by src/choose_config.py (50-70% rule)
+model: {name: yolov8n, imgsz: 320}

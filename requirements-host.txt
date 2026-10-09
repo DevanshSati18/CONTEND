@@ -1,0 +1,11 @@
+ultralytics>=8.3
+onnx
+onnxruntime
+onnxslim
+opencv-python
+numpy
+pandas
+scipy
+statsmodels
+matplotlib
+pyyaml

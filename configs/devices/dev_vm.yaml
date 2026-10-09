@@ -1,0 +1,9 @@
+# Development VM (Linux arm64 VM on the researcher's Mac). Pipeline dry runs only:
+# NOT edge hardware, so its results are never used as evidence in the paper.
+device_label: "Linux arm64 VM on Apple-silicon Mac (development only)"
+platform_class: dev
+runtime: {backend: ort, model_ext: onnx, precision: fp32}
+nms: {device: cpu}
+platform: {detector_cores: [0, 1], corunner_cores: [2, 3], max_start_temp_c: 200}
+deadline: {fps: 15}
+model: {name: yolov8n, imgsz: 320}
