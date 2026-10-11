@@ -117,7 +117,13 @@ def rq1_rq2(df, cfg, nboot):
                    I_T_ms=mD - mB - mC + mA, I_T_ci95=[float(np.percentile(it, 2.5)), float(np.percentile(it, 97.5))])
         row.update(session_robustness(cm, nboot, a_adj, m))
         if row["decision_cluster"] is not None:
-            row["robust_across_sessions"] = bool(row["decision_cluster"] == dec)
+            # robust = decisive (H0/H1/below), same under the two-stage bootstrap, and every
+            # session's own point estimate falls on the same side of the margin as the pooled one
+            m_ = row["margin"]
+            def side(r):
+                return "in" if abs(np.log(r)) < np.log(1 + m_) else ("above" if r > 1 else "below")
+            row["robust_across_sessions"] = bool(dec != "inconclusive" and row["decision_cluster"] == dec
+                                                 and all(side(x) == side(row["ratio"]) for x in row["ratio_by_session"]))
         res1.append(row)
         for s in STAGES:
             def ks(sm, s=s):
