@@ -153,7 +153,7 @@ setup_nvidia() {
   ok "swap: $(free -m | awk '/Swap/{print $2}') MB"
   sudo apt-get update -q
   sudo apt-get install -y -q python3-pip python3-dev python3-yaml python3-pandas python3-scipy \
-       libopenblas-base libopenmpi-dev libjpeg-dev zlib1g-dev gcc git tmux
+       libopenblas-base libopenmpi-dev libomp-dev libjpeg-dev zlib1g-dev gcc git tmux
   say "python -> python3.6"
   sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.6 1 >/dev/null
   ok "$(python --version 2>&1)"
