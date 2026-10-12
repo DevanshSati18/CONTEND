@@ -1,0 +1,136 @@
+[17:44:42] CONTEND runscript: device=jetson_nano  sessions=3  blocks=E1 E2 E3  git=9aa8073
+
+[17:44:42] ==============================================================================
+[17:44:42] 1/8  Environment for jetson_nano
+[17:44:42] ==============================================================================
+[17:44:49] python: /usr/bin/python3 - all packages present
+[17:44:49] $ gcc -O2 -o /home/sitacs/Desktop/CONTEND/corunners/bwhog /home/sitacs/Desktop/CONTEND/corunners/bwhog.c
+[17:44:50] $ gcc -O2 -o /home/sitacs/Desktop/CONTEND/corunners/cpuhog /home/sitacs/Desktop/CONTEND/corunners/cpuhog.c
+[17:44:50] co-runners compiled
+
+[17:44:50] ==============================================================================
+[17:44:50] 2/8  Platform control (fixed clocks / governor)
+[17:44:50] ==============================================================================
+[17:44:50] $ bash scripts/11_nano_session.sh
+    NVPM WARN: fan mode is not set!
+    NV Power Mode: MAXN
+    0
+    SOC family:tegra210  Machine:NVIDIA Jetson Nano Developer Kit
+    Online CPUs: 0-3
+    cpu0: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu1: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu2: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu3: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    GPU MinFreq=921600000 MaxFreq=921600000 CurrentFreq=921600000
+    EMC MinFreq=204000000 MaxFreq=1600000000 CurrentFreq=1600000000 FreqOverride=1
+    Fan: PWM=255
+    NV Power Mode: MAXN
+    Idle 5 minutes before the first run. Write the room temperature into docs/session_log.md.
+
+[17:44:51] ==============================================================================
+[17:44:51] 3/8  Evaluation images (seeded subset)
+[17:44:51] ==============================================================================
+[17:44:52] downloading 500 COCO images...
+[17:46:18] 500 images present (500 downloaded now)
+
+[17:46:18] ==============================================================================
+[17:46:18] 4/8  Models and perturbations
+[17:46:18] ==============================================================================
+[17:46:19] candidates (ONNX + perturbation): yolov8n_320, yolov8n_416
+[17:46:19] building TensorRT FP16 engines (~5-10 min each): models/yolov8n_320.onnx models/yolov8n_416.onnx
+[17:46:19] $ bash scripts/12_build_engines.sh models/yolov8n_320.onnx models/yolov8n_416.onnx
+    == building models/yolov8n_320.engine
+    [10/12/2026-17:54:27] [I] Total GPU Compute Time: 2.98635 s
+    [10/12/2026-17:54:27] [I] Explanations of the performance metrics are printed in the verbose logs.
+    [10/12/2026-17:54:27] [I] 
+    &&&& PASSED TensorRT.trtexec [TensorRT v8201] # /usr/src/tensorrt/bin/trtexec --onnx=models/yolov8n_320.onnx --saveEngine=models/yolov8n_320.engine --fp16 --workspace=1024
+    == building models/yolov8n_416.engine
+    [10/12/2026-18:02:49] [I] Total GPU Compute Time: 2.98627 s
+    [10/12/2026-18:02:49] [I] Explanations of the performance metrics are printed in the verbose logs.
+    [10/12/2026-18:02:49] [I] 
+    &&&& PASSED TensorRT.trtexec [TensorRT v8201] # /usr/src/tensorrt/bin/trtexec --onnx=models/yolov8n_416.onnx --saveEngine=models/yolov8n_416.engine --fp16 --workspace=1024
+    -rw-rw-r-- 1 sitacs sitacs  8693842 Oct 12 17:54 models/yolov8n_320.engine
+    -rw-rw-r-- 1 sitacs sitacs 14903568 Oct 12 18:02 models/yolov8n_416.engine
+[18:02:50] models ready
+
+[18:02:50] ==============================================================================
+[18:02:50] 5/8  Configuration choice (clean latency at 50-70 % of the frame deadline)
+[18:02:50] ==============================================================================
+[18:02:52] $ /usr/bin/python3 src/choose_config.py --models models/yolov8n_320.engine models/yolov8n_416.engine
+    device: jetson_nano   backend: trt
+    model                      mean ms  %@30fps  %@15fps  %@10fps  %@5fps  %@2fps
+    yolov8n_320                  25.43       76%       38%       25%       13%        5%   
+    yolov8n_416                  36.58      110%       55%       37%       18%        7%   OK at 15 FPS
+    
+    RECOMMENDED for jetson_nano: model.name=yolov8n  model.imgsz=416  deadline.fps=15  (clean 36.6 ms)
+[18:07:59] LOCKED: yolov8n @ 416, 15 FPS (clean 36.6 ms = 55 % of the deadline)
+
+[18:07:59] ==============================================================================
+[18:07:59] 4/8  Models and perturbations
+[18:07:59] ==============================================================================
+[18:08:00] candidates (ONNX + perturbation): yolov8n_320, yolov8n_416
+[18:08:01] models ready
+
+[18:08:01] ==============================================================================
+[18:08:01] 6/8  Gates G1 (workload), G2 (contention), G3 (pilot)
+[18:08:01] ==============================================================================
+[18:08:01] $ /usr/bin/python3 src/check_workload.py --backend trt --model models/yolov8n_416.engine --imgsz 416 --delta perturbations/yolov8n_416.npy --n 200 --out /home/sitacs/Desktop/CONTEND/results/jetson_nano/derived/g1_device.json
+    {
+      "clean": {
+        "n_pre_nms": 30.5,
+        "n_post_nms": 4.65,
+        "t_inf_ms": 24.642110224972384,
+        "t_nms_ms": 11.403695845006041,
+        "t_pre_ms": 8.054889710024327,
+        "t_d2h_ms": 0.16204049499719986
+      },
+      "adv": {
+        "n_pre_nms": 983.865,
+        "n_post_nms": 225.285,
+        "t_inf_ms": 24.72100912501446,
+        "t_nms_ms": 6.71561694999582,
+        "t_pre_ms": 10.054128520009726,
+        "t_d2h_ms": 0.1707860099759273
+      },
+      "candidate_ratio": 32.25786885245902,
+      "nms_increase_ms_mean": -4.6880788950102215,
+      "nms_increase_ms_ci95": [
+        -15.129947631643404,
+        1.0977286348755775
+      ],
+      "G1_pass": false
+    }
+    G1 FAIL: candidates x32.3, NMS +-4.69 ms (95% CI -15.13 to 1.10)
+[18:10:38] $ /usr/bin/python3 src/run_experiment.py g2 --model models/yolov8n_416.engine
+    G2_A_mem_low_r00              500 frames  temp 50.0 C  co-runner []
+    G2_C_mem_low_r00              500 frames  temp 50.0 C  co-runner [5.496537037037037]
+    G2 mem_low  clean 38.03 ms -> loaded 45.42 ms  (+19.4%)  PASS
+    G2_A_mem_high_r00             500 frames  temp 50.0 C  co-runner []
+    G2_C_mem_high_r00             500 frames  temp 50.0 C  co-runner [3.7409342105263157, 4.060486842105264]
+    G2 mem_high clean 37.53 ms -> loaded 51.21 ms  (+36.5%)  PASS
+    G2_A_cpu_r00                  500 frames  temp 50.0 C  co-runner []
+    G2_C_cpu_r00                  500 frames  temp 50.0 C  co-runner [58.554545454545455, 58.58484848484848]
+    G2 cpu      clean 37.56 ms -> loaded 36.88 ms  (-1.8%)  CONTROL (reported, no threshold)
+[18:29:29] $ /usr/bin/python3 src/run_experiment.py pilot --runs 3 --model models/yolov8n_416.engine
+    PILOT_A_mem_high_r00         1000 frames  temp 50.0 C  co-runner []
+    PILOT_A_mem_high_r01         1000 frames  temp 50.0 C  co-runner []
+    PILOT_A_mem_high_r02         1000 frames  temp 50.0 C  co-runner []
+    PILOT_B_mem_high_r00         1000 frames  temp 50.0 C  co-runner []
+    PILOT_B_mem_high_r01         1000 frames  temp 50.0 C  co-runner []
+    PILOT_B_mem_high_r02         1000 frames  temp 50.0 C  co-runner []
+    PILOT_C_mem_high_r00         1000 frames  temp 50.0 C  co-runner [3.7873857142857137, 3.519507246376812]
+    PILOT_C_mem_high_r01         1000 frames  temp 50.0 C  co-runner [3.72469014084507, 3.557898550724638]
+    PILOT_C_mem_high_r02         1000 frames  temp 50.0 C  co-runner [3.59831343283582, 3.687358208955223]
+    PILOT_D_mem_high_r00         1000 frames  temp 50.0 C  co-runner [3.6841948051948044, 3.7719620253164567]
+    PILOT_D_mem_high_r01         1000 frames  temp 50.0 C  co-runner [3.6930641025641013, 3.779177215189873]
+    PILOT_D_mem_high_r02         1000 frames  temp 50.0 C  co-runner [3.6286973684210526, 3.797289473684209]
+    cell A  mean 37.67 ms  between-run CV 0.87%
+    cell B  mean 41.24 ms  between-run CV 0.79%
+    cell C  mean 50.46 ms  between-run CV 0.94%
+    cell D  mean 54.86 ms  between-run CV 0.52%
+    G3: worst CV 0.94% -> about 6 runs per cell needed (minimum 6)
+[19:09:49] G1 FAIL | G2 cpu control, mem_high PASS, mem_low PASS | G3 6 runs per cell needed
+[19:09:49] $ /usr/bin/python3 analysis/report.py
+    wrote /home/sitacs/Desktop/CONTEND/results/jetson_nano/REPORT.md
+[19:09:52] STOP: gate failed: G1 (attack does not inflate the NMS workload enough on this device: candidates x32.3).
+See README 'If a gate fails' (e.g. nms.device: cpu, stronger co-runner). Re-run with --force to continue anyway (record it in docs/CHANGELOG.md).

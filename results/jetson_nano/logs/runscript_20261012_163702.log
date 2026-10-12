@@ -1,0 +1,88 @@
+[16:37:02] CONTEND runscript: device=jetson_nano  sessions=3  blocks=E1 E2 E3  git=9aa8073
+
+[16:37:02] ==============================================================================
+[16:37:02] 1/8  Environment for jetson_nano
+[16:37:02] ==============================================================================
+[16:37:04] missing Python packages: torch torchvision
+[16:37:04] running the one-time setup script setup.sh --nvidia (asks for your sudo password)
+[16:37:04] $ bash setup.sh --nvidia
+    
+    [1m== Jetson: NVIDIA Jetson Nano Developer Kit | # R32 (release), REVISION: 7.6, GCID: 38171779, BOARD: t210ref, EABI: aarch64, DATE: Tue Nov  5 07:46:14 UTC 2024[0m
+       OK   JetPack 4.x (Jetson Nano)
+    
+    [1m== Swap (4 GB; the torchvision build runs out of memory without it)[0m
+       OK   swap: 6077 MB
+    Get:1 file:/var/cuda-repo-l4t-10-2-local  InRelease
+    Ign:1 file:/var/cuda-repo-l4t-10-2-local  InRelease
+    Get:2 file:/var/visionworks-repo  InRelease
+    Ign:2 file:/var/visionworks-repo  InRelease
+    Get:3 file:/var/visionworks-sfm-repo  InRelease
+    Ign:3 file:/var/visionworks-sfm-repo  InRelease
+    Get:4 file:/var/visionworks-tracking-repo  InRelease
+    Ign:4 file:/var/visionworks-tracking-repo  InRelease
+    Get:5 file:/var/cuda-repo-l4t-10-2-local  Release [564 B]
+    Get:6 file:/var/visionworks-repo  Release [2,001 B]
+    Get:7 file:/var/visionworks-sfm-repo  Release [2,005 B]
+    Get:8 file:/var/visionworks-tracking-repo  Release [2,010 B]
+    Get:5 file:/var/cuda-repo-l4t-10-2-local  Release [564 B]
+    Get:6 file:/var/visionworks-repo  Release [2,001 B]
+    Get:7 file:/var/visionworks-sfm-repo  Release [2,005 B]
+    Get:8 file:/var/visionworks-tracking-repo  Release [2,010 B]
+    Hit:9 https://cli.github.com/packages stable InRelease
+    Hit:10 https://repo.download.nvidia.com/jetson/common r32.7 InRelease
+    Hit:11 https://repo.download.nvidia.com/jetson/t210 r32.7 InRelease
+    Hit:14 http://ports.ubuntu.com/ubuntu-ports bionic InRelease
+    Hit:16 http://ports.ubuntu.com/ubuntu-ports bionic-updates InRelease
+    Hit:18 http://ports.ubuntu.com/ubuntu-ports bionic-backports InRelease
+    Hit:19 http://ports.ubuntu.com/ubuntu-ports bionic-security InRelease
+    Reading package lists...
+    Reading package lists...
+    Building dependency tree...
+    Reading state information...
+    libjpeg-dev is already the newest version (8c-2ubuntu8).
+    python3-yaml is already the newest version (3.12-1build2).
+    libopenblas-base is already the newest version (0.2.20+ds-4).
+    libopenmpi-dev is already the newest version (2.1.1-8).
+    python3-scipy is already the newest version (0.19.1-2ubuntu1).
+    gcc is already the newest version (4:7.4.0-1ubuntu2.3).
+    git is already the newest version (1:2.17.1-1ubuntu0.18).
+    python3-dev is already the newest version (3.6.7-1~18.04).
+    tmux is already the newest version (2.6-3ubuntu0.3).
+    zlib1g-dev is already the newest version (1:1.2.11.dfsg-0ubuntu2.2).
+    python3-pandas is already the newest version (0.22.0-4ubuntu1).
+    python3-pip is already the newest version (9.0.1-2.3~ubuntu1.18.04.8).
+    The following packages were automatically installed and are no longer required:
+      apt-clone archdetect-deb bogl-bterm busybox-static cryptsetup-bin
+      dpkg-repack efibootmgr gir1.2-timezonemap-1.0 gir1.2-xkl-1.0 grub-common
+      kde-window-manager kinit kio kpackagetool5 kwayland-data kwin-common
+      kwin-data kwin-x11 libdebian-installer4 libkdecorations2-5v5
+      libkdecorations2private5v5 libkf5activities5 libkf5attica5
+      libkf5completion-data libkf5completion5 libkf5declarative-data
+      libkf5declarative5 libkf5doctools5 libkf5globalaccel-data libkf5globalaccel5
+      libkf5globalaccelprivate5 libkf5idletime5 libkf5jobwidgets-data
+      libkf5jobwidgets5 libkf5kcmutils-data libkf5kcmutils5 libkf5kiocore5
+      libkf5kiontlm5 libkf5kiowidgets5 libkf5newstuff-data libkf5newstuff5
+      libkf5newstuffcore5 libkf5package-data libkf5package5 libkf5plasma5
+      libkf5quickaddons5 libkf5solid5 libkf5solid5-data libkf5sonnet5-data
+      libkf5sonnetcore5 libkf5sonnetui5 libkf5textwidgets-data libkf5textwidgets5
+      libkf5waylandclient5 libkf5waylandserver5 libkf5xmlgui-bin libkf5xmlgui-data
+      libkf5xmlgui5 libkscreenlocker5 libkwin4-effect-builtins1 libkwineffects11
+      libkwinglutils11 libkwinxrenderutils11 libqgsttools-p1 libqt5designer5
+      libqt5help5 libqt5multimedia5 libqt5multimedia5-plugins
+      libqt5multimediaquick-p5 libqt5multimediawidgets5 libqt5opengl5
+      libqt5quickwidgets5 libqt5sql5 libqt5test5 libxcb-composite0 libxcb-cursor0
+      libxcb-damage0 os-prober python3-dbus.mainloop.pyqt5 python3-icu python3-pam
+      python3-pyqt5 python3-pyqt5.qtsvg python3-pyqt5.qtwebkit
+      qml-module-org-kde-kquickcontrolsaddons qml-module-qtmultimedia
+      qml-module-qtquick2 rdate tasksel tasksel-data
+    Use 'sudo apt autoremove' to remove them.
+    0 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+    
+    [1m== python -> python3.6[0m
+       OK   Python 3.6.9
+    
+    [1m== PyTorch 1.10.0 (NVIDIA wheel)[0m
+    
+       STOP put torch-1.10.0-cp36-cp36m-linux_aarch64.whl in ~/wheels/ (NVIDIA 'PyTorch for Jetson' forum, JetPack 4.6) and re-run
+       (full log: /home/sitacs/Desktop/CONTEND/setup_20261012_163704.log)
+[16:37:19] STOP: command failed (exit 1): bash setup.sh --nvidia
