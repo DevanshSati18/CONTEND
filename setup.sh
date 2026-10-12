@@ -158,6 +158,9 @@ setup_nvidia() {
   sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.6 1 >/dev/null
   ok "$(python --version 2>&1)"
   PY=$(command -v python3)
+  say "pip (Ubuntu 18.04 ships pip 9, too old for aarch64 manylinux2014 wheels)"
+  $PY -m pip install --user -q --upgrade "pip<22" "setuptools<60" wheel
+  ok "$($PY -m pip --version)"
   say "PyTorch 1.10.0 (NVIDIA wheel)"
   if ! $PY -c "import torch" 2>/dev/null; then
     WHL=$(ls "$HOME"/wheels/torch-1.10.0-cp36-cp36m-linux_aarch64.whl 2>/dev/null || true)
