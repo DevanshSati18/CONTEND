@@ -172,8 +172,10 @@ setup_nvidia() {
   ok "torch $($PY -c 'import torch;print(torch.__version__)') with CUDA"
   say "torchvision 0.11.1 from source (~45-60 min, once)"
   if ! $PY -c "import torchvision" 2>/dev/null; then
+    $PY -m pip install --user -q "pillow<9"      # newest Pillow for Python 3.6; the build would fetch an incompatible one
     [ -d "$HOME/torchvision" ] || git clone -q --depth 1 --branch v0.11.1 https://github.com/pytorch/vision "$HOME/torchvision"
-    (cd "$HOME/torchvision" && BUILD_VERSION=0.11.1 MAX_JOBS=2 $PY setup.py install --user >/dev/null)
+    (cd "$HOME/torchvision" && BUILD_VERSION=0.11.1 MAX_JOBS=2 $PY setup.py install --user > "$ROOT/torchvision_build.log" 2>&1) \
+      || die "torchvision build failed: see the last lines of torchvision_build.log"
   fi
   $PY -c "import torch, torchvision; b=torch.rand(50,4).cuda()*100; b[:,2:]+=b[:,:2]; torchvision.ops.nms(b, torch.rand(50).cuda(), .5)" \
     || die "torchvision CUDA NMS failed"
