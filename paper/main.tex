@@ -1,6 +1,7 @@
-% CONTEND - MoSICom 2026 submission draft (IEEE conference format; confirm template + page limit)
-% Build on Overleaf (upload this folder) or locally:  latexmk -pdf main.tex
-% \TODO{...} marks every number that must come from results/derived/results.json.
+% CONTEND - MoSICom 2026 submission, first full draft (IEEE conference format).
+% Build: latexmk -pdf main.tex   (or upload paper/ + results/*/figures to Overleaf)
+% Red \TODO{...} = numbers that come from results/<device>/REPORT.md or derived/results.json.
+% Confirm the MoSICom page limit and whether review is double-blind before submission.
 \documentclass[conference]{IEEEtran}
 \usepackage{cite}
 \usepackage{amsmath,amssymb}
@@ -9,186 +10,326 @@
 \usepackage{xcolor}
 \usepackage{url}
 \newcommand{\TODO}[1]{\textcolor{red}{[#1]}}
-\graphicspath{{../figures/}{figures/}}
+\graphicspath{{../results/raspberry_pi/figures/}{../results/combined/}{figures/}}
+% Figure that shows a placeholder box until the run has produced the PDF
+\newcommand{\resultfig}[2]{\IfFileExists{#1}{\includegraphics[width=\columnwidth]{#1}}%
+  {\fbox{\parbox[c][#2][c]{0.95\columnwidth}{\centering\TODO{figure \detokenize{#1} from the device run}}}}}
 
 \begin{document}
 
 \title{Does Resource Contention Amplify NMS Latency Attacks?\\
-A Controlled Factorial Study on a Unified-Memory Edge SoC}
+A Controlled Factorial Study on Edge Devices}
 
 % Remove for double-blind review if the call requires it
-\author{\IEEEauthorblockN{\TODO{Author Name}}
-\IEEEauthorblockA{\TODO{Affiliation}\\ \TODO{email}}}
+\author{\IEEEauthorblockN{\TODO{Author Name(s)}}
+\IEEEauthorblockA{\TODO{Department, Institution}\\ \TODO{City, Country}\\ \TODO{email}}}
 
 \maketitle
 
 \begin{abstract}
-Latency attacks inflate the number of candidate boxes entering non-maximum suppression (NMS)
-so that an object detector overruns its real-time budget. Prior work has claimed that
-interference from co-located workloads magnifies these attacks, but supported the claim only by
-comparing different GPUs, and an independent re-evaluation has questioned whether the attacks
-matter in practice at all. We test the claim directly on an NVIDIA Jetson Nano, whose CPU and GPU
-share one memory system. In a controlled 2$\times$2 factorial design (clean or adversarial input,
-with or without a background co-runner), we predict the combined latency from isolated
-measurements with a stage-wise proportional-slowdown model and test the prediction with a
-pre-registered $\pm$5\% equivalence margin. \TODO{Under memory-bandwidth contention the measured
-latency was X\% of the prediction (95\% CI a--b): predictable / amplified.} \TODO{NMS-stage
-sensitivity ...} \TODO{At 30 FPS, contention changed the attack's deadline-miss increase from
-... to ...} The result bounds the magnification claim to measurable conditions and shows when
-isolated profiling is sufficient for real-time budgeting.
+Latency attacks on object detectors craft inputs that flood non-maximum suppression (NMS) with
+spurious candidate boxes, so that a real-time pipeline misses its frame deadline. A recent study
+argued that interference from co-located workloads magnifies such attacks, but the supporting
+evidence compared different GPUs, so hardware and contention varied together. We isolate the
+contention factor on edge hardware. On a Raspberry Pi \TODO{model} (CPU-only inference)
+\TODO{and an NVIDIA Jetson Nano (GPU inference)}, we run a 2$\times$2 factorial experiment that
+crosses clean or adversarial input with the presence or absence of a background co-runner, using a
+memory-bandwidth co-runner and a cache-resident CPU co-runner as a control. Because a uniform
+slowdown already produces a positive additive interaction, we instead predict the combined
+latency from isolated measurements with a stage-wise proportional-slowdown model and test the
+prediction against a pre-registered $\pm$5\% equivalence margin, repeating every condition in
+independent sessions. \TODO{Under memory-bandwidth contention, measured latency was X\% of the
+prediction (95\% CI a--b), i.e. predictable / amplified; the CPU control gave ...} \TODO{At the
+deployed frame rate, contention changed the attack's deadline-miss increase from ... to ...}
+The results delimit when profiling an attack in isolation is sufficient for real-time budgeting
+on shared-resource edge platforms.
 \end{abstract}
 
 \begin{IEEEkeywords}
-latency attack, non-maximum suppression, resource contention, edge AI, real-time object detection,
-availability, Jetson
+latency attack, non-maximum suppression, resource contention, edge AI, real-time object
+detection, availability, Raspberry Pi, Jetson
 \end{IEEEkeywords}
 
+% ---------------------------------------------------------------------------------------------
 \section{Introduction}
-Real-time object detectors on edge devices must finish each frame within a fixed budget,
-about 33.3\,ms at 30 frames per second. Latency attacks target that budget rather than the
-correctness of the prediction: an adversarial input floods NMS with phantom candidate boxes,
-and NMS cost grows roughly quadratically with the candidate count
-\cite{shapira2023phantom,chen2024overload,wang2021daedalus}.
+Camera-based perception on embedded platforms is a real-time task: a detector serving a 30
+frames-per-second stream has roughly 33\,ms per frame, and a frame that arrives late is often as
+useless as a wrong one. Latency attacks exploit this by targeting availability instead of
+accuracy. A small, often universal, perturbation causes the network to emit thousands of
+low-quality candidate boxes, and the post-processing step that suppresses overlapping boxes,
+NMS, then dominates the frame time because its cost grows super-linearly with the number of
+candidates \cite{wang2021daedalus,shapira2023phantom,chen2024overload}.
 
-Two observations motivate this paper. First, the practical size of these attacks is contested:
-an independent evaluation across seven platforms and fifteen YOLO models concluded that their
-real-world impact is limited under realistic settings \cite{monteuuis2025evade}, and reported
-amplification factors depend on configuration details \cite{gu2026survey}. Second, edge
-detectors rarely run alone. On integrated system-on-chips the CPU and GPU share DRAM, and
-memory-intensive CPU tasks can substantially slow real-time GPU work \cite{ali2018bwlock,jang2020rtod}.
+How much these attacks matter in practice is now disputed. Attack papers report
+inference times up to ten times longer on embedded GPUs \cite{chen2024overload}, whereas an
+independent evaluation framework, EVADE, concluded that under realistic deployment settings the
+added latency stays within downstream requirements and that the attacks transfer poorly
+\cite{monteuuis2025evade}. A recent survey of latency attacks across domains attributes such
+disagreements partly to system factors that model-level measurements do not capture, and lists
+the sharing of resources among them \cite{gu2026survey}.
 
-Wang \emph{et al.} \cite{wang2025cantslow} claimed that interference from co-located users
-magnifies latency attacks, but their evidence compares a multi-tenant A100 with a single-tenant
-RTX~4070Ti, so GPU model and contention change together. A 2026 survey identifies resource
-sharing as one of the factors that decide whether a model-level slowdown becomes a system-level
-failure, invisible to the model-level measurements most studies report \cite{gu2026survey}.
-Whether contention amplifies the attack, or simply slows everything proportionally, has not been
-tested under control.
+Resource sharing is the norm on edge devices. A detector rarely owns the board: logging,
+networking, tracking and control tasks run beside it, and on these systems-on-chip all cores
+share the last-level cache and the DRAM controller. Memory-intensive co-runners are known to
+slow real-time workloads severalfold on such platforms
+\cite{valsan2016isolbench,ali2018bwlock,bechtel2018deeppicar}. Wang \emph{et al.} explicitly argued that
+interference from other users of the same machine magnifies the effect of latency attacks, and
+supported this by observing stronger attacks on a multi-tenant cloud A100 than on a single-tenant
+desktop RTX~4070Ti \cite{wang2025cantslow}. That comparison changes the GPU, the memory system
+and the tenancy at once, so it cannot attribute the difference to contention.
 
-A naive test would not answer the question: if contention slows every stage by a fixed factor
-$k$, the additive interaction $T_D-T_B-T_C+T_A=(k-1)(T_B-T_A)$ is positive by construction. We
-therefore ask whether adversarial post-processing is \emph{more sensitive} to contention than
-clean post-processing, beyond proportional slowdown. Our contributions are:
+This paper tests the claim under control. The question is subtle: if contention slowed every
+stage of the pipeline by the same factor $k$, the classic additive interaction
+$T_D-T_B-T_C+T_A=(k-1)(T_B-T_A)$ would be positive for any attack that adds work, so a
+``significant interaction'' would say nothing about amplification. We therefore ask whether the
+adversarial workload is \emph{more sensitive} to contention than clean work, beyond what a
+stage-wise proportional slowdown predicts. Our contributions are:
 \begin{itemize}
-\item a controlled 2$\times$2 factorial test of the contention-magnification claim on a
-unified-memory edge SoC, with two co-runner types that separate memory-bandwidth from CPU contention;
-\item a stage-wise proportional-slowdown model that predicts combined latency from isolated
-runs, tested with a pre-registered equivalence margin, and stage-level attribution of any deviation;
-\item a deadline characterisation at 30\,FPS (absolute miss increase, drops, consecutive misses);
-\item an open harness, configuration and raw logs (CONTEND).
+\item a controlled 2$\times$2 factorial test of the contention-amplification claim on edge
+hardware, with a memory-bandwidth co-runner and a CPU-only control co-runner that separate DRAM
+contention from processor sharing;
+\item a stage-wise proportional-slowdown null model that predicts combined latency from isolated
+runs, tested with a pre-registered equivalence margin and attributed to pipeline stages;
+\item a repeated-session protocol and robustness criterion that guard the conclusion against
+run-to-run and day-to-day variation, together with deadline metrics at the deployed frame rate;
+\item the open CONTEND harness, configuration and per-frame logs for both devices.
 \end{itemize}
 
+% ---------------------------------------------------------------------------------------------
 \section{Background and Related Work}
-\textbf{NMS latency attacks.} Daedalus \cite{wang2021daedalus} first broke NMS with dense false
-positives; Phantom Sponges \cite{shapira2023phantom} produced a universal perturbation that
-overloads NMS while preserving original detections; Overload \cite{chen2024overload} reported
-about 10$\times$ inference time on a Jetson NX; Groundswell \cite{xia2026groundswell} improved
-stealth and optimisation cost on desktop GPUs. Physical and pipeline-level variants extend the
-threat to trackers \cite{ma2024slowtrack,muller2025detstorm,gu2026trackflood,li2026aesop}, and
-efficiency attacks on dynamic networks are systematised in \cite{rathnasuriya2025sok,shumailov2021sponge}.
+\textbf{NMS latency attacks.} Daedalus first showed that adversarial examples can break NMS by
+producing dense false positives \cite{wang2021daedalus}. Phantom Sponges optimised a universal
+perturbation that maximises the number of candidates passed to NMS while preserving the original
+detections, which makes the attack hard to notice \cite{shapira2023phantom}. Overload targeted
+edge devices directly and reported tenfold inference times for YOLOv5 on an NVIDIA NX
+\cite{chen2024overload}, and later work improved stealth and optimisation cost
+\cite{xia2026groundswell}. The threat extends to physical patches and projections
+\cite{muller2025detstorm}, to tracking pipelines \cite{ma2024slowtrack,gu2026trackflood} and to
+multi-stage deep-learning pipelines \cite{li2026aesop}; energy-latency attacks on neural networks
+more broadly are surveyed in \cite{shumailov2021sponge,rathnasuriya2025sok}.
 
-\textbf{Hardware and practicality.} Chen \emph{et al.} attribute the vulnerability to minor page
-faults \cite{chen2024resilience}. Wang \emph{et al.} found edge GPUs compute-bound and desktop GPUs
-memory-bound under attack and proposed hardware-adaptive adversarial training \cite{wang2025cantslow}.
-EVADE \cite{monteuuis2025evade} found the attacks rarely breach 100--500\,ms budgets when NMS runs
-on a GPU and that YOLOv8 caps the proposals passed to NMS.
+\textbf{Hardware and practicality.} Chen \emph{et al.} traced the slowdown to minor page faults
+and proposed selecting the implementation according to system state \cite{chen2024resilience}.
+Wang \emph{et al.} characterised attacked detection as compute-bound on embedded GPUs and
+increasingly memory-bound on desktop GPUs, and proposed hardware-adaptive adversarial training
+\cite{wang2025cantslow}. EVADE re-evaluated published attacks across hardware, model formats and
+quantisation and found their practical effect limited \cite{monteuuis2025evade}.
 
-\textbf{Contention on embedded SoCs.} DRAM-bandwidth contention between CPU and GPU on Jetson
-boards is well documented for benign workloads \cite{ali2018bwlock,jang2020rtod,valsan2016isolbench}.
-To our knowledge, no prior study has combined adversarial NMS workload with controlled contention
-on edge hardware (Table~\ref{tab:novelty}).
+\textbf{Contention on embedded multicores.} Shared caches and DRAM bandwidth are the main sources
+of interference on embedded multicores \cite{valsan2016isolbench}. On integrated CPU-GPU boards,
+memory-intensive CPU tasks slow GPU kernels substantially, which motivated bandwidth regulation
+\cite{ali2018bwlock}, and end-to-end detector delay depends strongly on how the pipeline shares
+the platform \cite{jang2020rtod}. On a Raspberry Pi, co-runners increased the execution time of a
+CNN control loop by up to 11.6$\times$ \cite{bechtel2018deeppicar}. These studies use benign
+workloads. Table~\ref{tab:novelty} positions our study: to our knowledge, none of the prior work
+crosses an adversarial NMS workload with controlled contention on edge hardware.
 
 \begin{table}[t]
-\caption{Closest prior work (condensed).}
+\caption{Closest prior work.}
 \label{tab:novelty}
 \centering\footnotesize
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lccc@{}}
 \toprule
-Work & Controlled contention & Joint 2$\times$2 & Edge HW \\
+Work & Controlled contention & Attack $\times$ load & Edge HW \\
 \midrule
-\cite{wang2025cantslow} & no (cross-GPU) & no & partly \\
-\cite{monteuuis2025evade} & no & no & yes \\
-\cite{chen2024overload,chen2024resilience} & no & no & yes \\
-\cite{ali2018bwlock} & yes & clean only & yes \\
+Wang \emph{et al.} \cite{wang2025cantslow} & no (cross-GPU) & no & partly \\
+EVADE \cite{monteuuis2025evade} & no & no & yes \\
+Overload / resilience \cite{chen2024overload,chen2024resilience} & no & no & yes \\
+BWLOCK++, DeepPicar \cite{ali2018bwlock,bechtel2018deeppicar} & yes & benign only & yes \\
 This work & yes & yes & yes \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+% ---------------------------------------------------------------------------------------------
+\section{Threat and System Model}
+The adversary controls the pixels reaching the camera input through a universal perturbation
+bounded in $L_\infty$, as in \cite{shapira2023phantom}, and has no code execution on the device.
+The detector shares the platform with benign background software, which we model with a
+co-runner pinned to the cores the detector does not use. We study two platform classes.
+On the \textbf{Raspberry Pi} \TODO{4 / 5, RAM}, inference and NMS run on the CPU with ONNX Runtime
+in FP32 on two pinned cores; the co-runners use the other two cores and share the L2 cache and
+DRAM with the detector. On the \textbf{NVIDIA Jetson Nano} \TODO{(if included)}, inference runs on
+the integrated Maxwell GPU as an FP16 TensorRT engine, with CPU and GPU sharing one LPDDR4 memory.
+Frames arrive at a fixed rate whose period is the deadline (Section~\ref{sec:setup}).
+
+% ---------------------------------------------------------------------------------------------
+\section{Method}
+\subsection{Factorial design}
+Four cells cross input and load: A (clean, no co-runner), B (adversarial, no co-runner),
+C (clean, co-runner) and D (adversarial, co-runner). A block runs every cell several times in a
+seeded random order with a cool-down between runs, and a run is skipped until the SoC temperature
+falls below a set limit, so that heat and drift cannot align with one condition. Each closed-loop
+run processes 3000 frames back-to-back after 300 warm-up frames, cycling through a fixed evaluation
+set. Every frame is timed per stage with synchronised timers: pre-processing ($s{=}$pre), network
+inference (inf), NMS (nms) and, on the GPU, device-to-host copy (d2h). A run is summarised by the
+5\%-trimmed mean of each stage, and \emph{the run, not the frame, is the experimental unit}.
+Three blocks are run: E1 with a high memory-bandwidth co-runner, E2 with the CPU control
+co-runner, and E3, an open-loop block at the deployed frame rate.
+
+\textbf{Sessions.} Mean latency moves slightly from run to run (thermal state, background
+activity, memory placement) and a whole sitting can drift. Each block is therefore repeated in
+$S$ independent sessions, each with a fresh random order; the runs needed per cell are spread
+over the sessions.
+
+\subsection{Co-runners}
+The memory-bandwidth co-runner streams reads and writes over a 256\,MB buffer, far larger than
+the last-level cache, so every access reaches DRAM; it reports its own throughput, which we log
+as an independent check. The control co-runner performs integer arithmetic on a cache-resident
+working set, loading the CPU without generating DRAM traffic. If amplification exists and comes
+from the memory system, it should appear under the first co-runner and not under the second.
+
+\subsection{Stage-wise proportional-slowdown model}
+End-to-end service time is the sum of stage times, $T=\sum_s T_s$. Contention sensitivity is
+measured on clean input only, and the combined latency is predicted from the isolated cells:
+\begin{equation}
+k_s=\frac{\bar T_s(C)}{\bar T_s(A)},\qquad \hat T_D=\sum_s k_s\,\bar T_s(B).
+\end{equation}
+The prediction assumes that contention scales each stage of adversarial processing as it scales
+the same stage of clean processing. It allows the attack to shift time between stages, which a
+single end-to-end factor would not. The test statistic is $R=\log(\bar T_D/\hat T_D)$.
+Confidence intervals come from a run-level bootstrap \cite{efron1993bootstrap} that resamples runs
+within each cell and session (10\,000 replicates). With margin $m=\log(1.05)$ and
+$\alpha'=0.05/n_{\text{types}}$ (Bonferroni over contention types), the decision rule is:
+\emph{predictable} (H0) if the $(1-2\alpha')$ interval lies inside $[-m,m]$, i.e.\ two one-sided
+tests \cite{lakens2017tost}; \emph{amplified} (H1) if the $(1-\alpha')$ interval lies above $m$;
+\emph{below prediction} if it lies below $-m$; otherwise inconclusive.
+
+\textbf{Robustness across sessions.} We also report $R$ for each session on its own, the
+between-session standard deviation of $R$, and a two-stage bootstrap that first resamples whole
+sessions and then runs inside them, which carries day-to-day variation into the interval. A
+decision is called \emph{robust} only if it is decisive, the two-stage bootstrap reaches the same
+decision, and every session's estimate falls on the same side of the margin.
+
+\textbf{Stage attribution (RQ2).} For each stage we compare $k_s^{\text{adv}}=\bar T_s(D)/\bar
+T_s(B)$ with $k_s^{\text{clean}}$; a ratio above one locates any amplification. A regression of
+log service time on input, load, their interaction, run order, start temperature and session
+(HC3 errors) serves as a secondary check. The naive additive interaction is reported only for
+contrast.
+
+\subsection{Deadline metrics (RQ3)}
+In open-loop runs, frames are released at the deployed rate into a bounded queue of four frames
+that drops the oldest frame when full. A frame misses its deadline if it completes late or is
+dropped. We report the miss rate per cell, the absolute miss increase caused by the attack with
+and without contention, $P_\text{miss}(D)-P_\text{miss}(C)$ versus $P_\text{miss}(B)-P_\text{miss}(A)$,
+the longest run of consecutive misses and the 95th-percentile tardiness, following the metrics
+recommended in \cite{gu2026survey}.
+
+\subsection{Gates and pre-registration}
+Three gates must pass on each device before the main blocks. G1 checks that the attack loads NMS
+on that device: at least ten times more candidates, with an NMS-time increase whose 95\% interval
+excludes zero. G2 checks that the memory co-runner slows clean latency by at least 10\%; the CPU
+co-runner is reported without a threshold, as it is the control. G3 is a pilot whose between-run
+variation sets the runs per cell. After the gates, the model, input size, frame rate, runs per
+cell and number of sessions are frozen in a timestamped, version-controlled configuration before
+the first main run; any later change is logged.
+
+% ---------------------------------------------------------------------------------------------
+\section{Experimental Setup}\label{sec:setup}
+\textbf{Detector and NMS.} YOLOv8n \cite{jocher2023ultralytics} exported to ONNX (opset 12). The
+input size is chosen per device from 320 and 416 pixels, together with the frame rate, so that
+clean latency lies at 50--70\% of the frame period; this leaves room for the attack and the load
+to matter without the clean system already failing. NMS is a vendored copy of the Ultralytics
+implementation (confidence 0.25, IoU 0.7, at most 300 detections and 30\,000 candidates),
+verified to produce identical outputs on 20 random trials.
+
+\textbf{Attack.} We re-implement the Phantom Sponges objective \cite{shapira2023phantom}: a
+universal perturbation with $\|\delta\|_\infty\le 16/255$ is optimised for 300 steps on 200 COCO
+val2017 images \cite{lin2014coco} to raise candidate confidences just above the threshold while
+keeping boxes small. The confidence term is applied to logits with a margin, because the
+probability-space form gave vanishing gradients in our implementation. Evaluation uses a seeded
+set of 500 different val2017 images.
+
+\textbf{Platforms.} Raspberry Pi \TODO{model, RAM, OS version}, performance CPU governor, official
+power supply and active cooling, ONNX Runtime \TODO{version}, detector on cores 0--1 and co-runners
+on cores 2--3. \TODO{Jetson Nano 4\,GB, JetPack 4.6.x (TensorRT 8.2), MAXN mode with locked clocks,
+NMS on the GPU.} Chosen configuration: \TODO{YOLOv8n at 320, X FPS, clean latency Y ms = Z\% of the
+deadline}. Runs per cell: \TODO{n} per session over \TODO{S} sessions.
+
+\textbf{Gate outcomes.} \TODO{G1: candidates $\times$X, NMS +Y ms (95\% CI). G2: memory co-runner
++X\%, CPU control +Y\%. G3: worst between-run CV Z\%.}
+
+% ---------------------------------------------------------------------------------------------
+\section{Results}
+\subsection{RQ1: Is the combined latency predictable?}
+\begin{figure}[t]\centering
+\resultfig{fig2_rq1_prediction.pdf}{3cm}
+\caption{Measured over predicted latency of cell D per contention type. Black: pooled estimate and
+95\% CI; grey: two-stage (session-level) CI; ticks: individual sessions; shaded band: the
+$\pm$5\% equivalence margin.}
+\label{fig:rq1}\end{figure}
+
+\begin{table}[t]
+\caption{RQ1 per device and contention type.}
+\label{tab:rq1}
+\centering\footnotesize
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+Device & Load & $\bar T_D/\hat T_D$ & 95\% CI & Decision & Robust \\
+\midrule
+Pi & Memory BW & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Pi & CPU (control) & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Nano & Memory BW & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Nano & CPU (control) & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Threat and System Model}
-The attacker controls camera input pixels through a universal perturbation (digital, as in
-\cite{shapira2023phantom}) and does not control the platform. The detector runs on an
-NVIDIA Jetson Nano (quad-core Cortex-A57, 128-core Maxwell GPU, 4\,GB LPDDR4 shared by CPU and GPU)
-alongside other on-board software, modelled by a background co-runner pinned to the remaining
-CPU cores. Frames arrive at \TODO{30} FPS; the per-frame deadline is \TODO{33.3}\,ms.
-
-\section{Method}
-\subsection{Factorial design}
-Cells A (clean, no load), B (adversarial, no load), C (clean, load) and D (adversarial, load)
-are run in a seeded random order, \TODO{n} independent runs per cell, each \TODO{3000} frames after
-300 warm-up frames, with cool-downs between runs. The run, not the frame, is the experimental unit.
-Two contention types are tested: a memory-bandwidth co-runner streaming over a 256\,MB buffer,
-and a cache-resident integer co-runner that loads the CPU without DRAM traffic (control).
-
-\subsection{Stage-wise proportional-slowdown model}
-End-to-end service time is the sum of stage times $T=\sum_s T_s$ for
-$s\in\{\text{pre-processing, inference, NMS, copy}\}$. Contention sensitivity is measured on
-clean input and the combined latency is predicted from isolated cells only:
-\begin{equation}
-k_s=\frac{\bar T_s(C)}{\bar T_s(A)},\qquad \hat T_D=\sum_s k_s\,\bar T_s(B).
-\end{equation}
-The test statistic is $R=\log(\bar T_D/\hat T_D)$, with a run-level bootstrap \cite{efron1993bootstrap}.
-H0 (predictable) holds when the $(1-2\alpha')$ CI of $R$ lies inside $\pm\log(1.05)$ (two one-sided
-tests \cite{lakens2017tost}); H1 (amplified) when the $(1-\alpha')$ CI lies above $+\log(1.05)$;
-$\alpha'=0.05$ divided by the number of contention types. For RQ2 we compare
-$k_s^{\text{adv}}=\bar T_s(D)/\bar T_s(B)$ with $k_s^{\text{clean}}$ per stage.
-
-\subsection{Deadline metrics}
-In open-loop runs frames are released at a fixed rate into a bounded drop-oldest queue of length 4.
-We report the deadline-miss rate (drops count as misses), the absolute miss increase
-$P_{\text{miss}}(D)-P_{\text{miss}}(C)$ versus $P_{\text{miss}}(B)-P_{\text{miss}}(A)$, maximum
-consecutive misses and P95 tardiness, following \cite{gu2026survey}.
-
-\section{Experimental Setup}
-JetPack \TODO{4.6.x} (TensorRT \TODO{8.x}, CUDA 10.2), MAXN power mode, locked clocks, fan at maximum.
-Model \TODO{YOLOv8n} at \TODO{416}$\times$\TODO{416}, FP16 TensorRT engine, chosen so that clean
-latency is 50--70\% of the deadline. NMS mirrors Ultralytics defaults \cite{jocher2023ultralytics}
-(confidence 0.25, IoU 0.7, max\_det 300) and runs on the GPU. Perturbation: Phantom Sponges
-objective \cite{shapira2023phantom}, $L_\infty\le16/255$, optimised on 200 COCO val2017 images
-\cite{lin2014coco} disjoint from the 500-image evaluation subset. Gate checks: candidates increased
-\TODO{x}$\times$; each co-runner slowed clean latency by \TODO{y}\%.
-
-\section{Results}
-\subsection{RQ1: Is the combined effect predictable?}
-\begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{fig2_rq1_prediction.pdf}
-\caption{Measured over predicted latency of cell D per contention type, 95\% CI; grey band: $\pm$5\% equivalence margin.}
-\label{fig:rq1}\end{figure}
-\TODO{Fill from results.json: ratio, CI, decision per contention type; report the naive interaction $I_T$ for contrast.}
+\TODO{Describe Fig.~\ref{fig:rq1} and Table~\ref{tab:rq1}: ratio and CI per contention type, the
+decision, the per-session ratios and between-session SD. Give the naive interaction $I_T$ for
+contrast, e.g. ``the additive interaction was +X ms (CI), which the proportional model fully
+explains''.}
 
 \subsection{RQ2: Which stage carries the effect?}
 \begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{fig3_rq2_stage_sensitivity.pdf}
-\caption{Per-stage contention slowdown for clean and adversarial input (95\% CI).}
+\resultfig{fig3_rq2_stage_sensitivity.pdf}{3cm}
+\caption{Per-stage contention slowdown $k_s$ for clean and adversarial input (95\% CI).}
 \label{fig:rq2}\end{figure}
-\TODO{NMS-stage $k^{\text{adv}}/k^{\text{clean}}$ with CI; memory-bandwidth vs CPU co-runner.}
+\TODO{NMS-stage $k^{\text{adv}}/k^{\text{clean}}$ with CI under memory vs CPU contention; note
+whether any excess sits in inference rather than NMS (seen in development runs).}
 
 \subsection{RQ3: Deadline consequences}
 \begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{fig4_rq3_trace.pdf}
-\caption{Per-frame latency in open-loop runs under contention, clean vs adversarial.}
+\resultfig{fig4_rq3_trace.pdf}{2.6cm}
+\caption{Per-frame latency in open-loop runs under memory contention, clean (C) and adversarial
+(D) input, against the deadline (dashed).}
 \label{fig:rq3}\end{figure}
-\TODO{Table of miss rate, drops, max consecutive misses per cell.}
+\TODO{Miss rates per cell; attack-induced miss increase with vs without contention (CI); drops,
+longest miss streak, P95 tardiness.}
 
-\section{Discussion and Limitations}
-\TODO{What the result means for \cite{wang2025cantslow} and \cite{monteuuis2025evade}.}
-Threats to validity: one platform and one detector family; a digital perturbation; synthetic
-co-runners; \TODO{n} runs per cell under a compressed schedule. Results are bounded to the tested
-configuration.
+% ---------------------------------------------------------------------------------------------
+\section{Discussion}
+\TODO{If predictable:} A predictable outcome means that, on these platforms, contention and the
+attack compose multiplicatively per stage: an operator can profile the attack in isolation,
+measure the platform's clean contention factors once, and budget the combined case without
+running it. The magnification reported across GPUs \cite{wang2025cantslow} would then reflect
+differences in hardware rather than contention itself. Predictable does not mean harmless: the
+combined case still costs $\sum_s k_s T_s(B)$, so when the attack already consumes most of the
+slack, the added contention can push frames past the deadline, as RQ3 quantifies.
+
+\TODO{If amplified:} An amplified outcome means isolated profiling underestimates worst-case
+latency, and the gap should be located with RQ2. Amplification confined to the NMS stage under
+memory but not CPU contention would point to the memory traffic of large candidate sets; this
+would support bandwidth regulation \cite{ali2018bwlock} or candidate caps as a defence.
+
+\textbf{Relation to EVADE.} \TODO{Whether the attack breaches the deadline at the deployed rate
+with and without contention, and how that qualifies the conclusion of \cite{monteuuis2025evade}
+for CPU-only edge devices.}
+
+\textbf{Threats to validity.} The study covers \TODO{one/two} boards, one detector family and a
+digital perturbation; co-runners are synthetic and constant, whereas real background load is
+bursty; the perturbation is optimised on a host and transferred to each device; and the equivalence
+margin of 5\% is a design choice, fixed before data collection. Results are bounded to the tested
+configurations, and the full logs are released so that other margins can be applied.
 
 \section{Conclusion}
-\TODO{One paragraph.} Future work: additional platforms (including CPU-only boards), tracker stages
-and contention-aware admission caps.
+\TODO{One paragraph: the question, the controlled design, the decision per device and contention
+type, and what it means for budgeting.} Future work covers more platforms and detector families,
+physical attacks, bursty and realistic co-runners, and contention-aware admission control.
+
+\section*{Data Availability}
+Code, configuration and per-frame logs: \TODO{repository URL}.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}

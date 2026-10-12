@@ -16,6 +16,9 @@ Paper: *Does Resource Contention Amplify NMS Latency Attacks? A Controlled Facto
 # once, on the Mac: put the repo on GitHub (private)
 cd ~/Development/CONTEND && gh repo create CONTEND --private --source . --push
 
+# any machine: set up the environment in one go (detects Pi / Jetson / Mac; --check = versions only)
+bash setup.sh
+
 # on the Raspberry Pi / Jetson Nano: clone and run everything with ONE command
 git clone https://github.com/<you>/CONTEND.git && cd CONTEND      # private repo: `gh auth login` first
 tmux new -s contend                       # keeps running if the SSH session drops (Ctrl-b d to detach)
@@ -74,6 +77,7 @@ The numbered scripts below still work step by step; `runscript.py` simply calls 
 ```
 CONTEND/
 ├── README.md                    this file: structure, commands, 6-day plan
+├── setup.sh                     ONE environment setup for Pi / Jetson / Mac (+ --check version report)
 ├── runscript.py                 ONE command per device: --pi / --nvidia / --dev / --compile
 ├── requirements-host.txt        Python packages for the host PC
 ├── configs/

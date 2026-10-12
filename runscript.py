@@ -43,8 +43,7 @@ import time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DEVICES = {"pi": "raspberry_pi", "nvidia": "jetson_nano", "dev": "dev_vm", "smoke": "smoke"}
-SETUP = {"raspberry_pi": "scripts/40_pi_setup.sh", "jetson_nano": "scripts/10_nano_setup.sh",
-         "dev_vm": "scripts/50_dev_setup.sh"}
+SETUP = {"raspberry_pi": "setup.sh --pi", "jetson_nano": "setup.sh --nvidia", "dev_vm": "setup.sh --linux"}
 PLATFORM = {"raspberry_pi": "scripts/41_pi_session.sh", "jetson_nano": "scripts/11_nano_session.sh"}
 NEED = {"jetson_nano": "numpy cv2 torch torchvision tensorrt yaml pandas scipy",
         "default": "numpy cv2 torch torchvision onnxruntime yaml pandas scipy matplotlib"}
@@ -197,7 +196,7 @@ def step_environment(ctx):
         if ctx.a.no_setup or ctx.dev not in SETUP:
             die("install them (see README) or run without --no-setup")
         say("running the one-time setup script %s (asks for your sudo password)" % SETUP[ctx.dev])
-        run(["bash", SETUP[ctx.dev]])
+        run(["bash"] + SETUP[ctx.dev].split())
         ctx.py = ctx.pick_python()
         miss = ctx.missing()[0]
         if miss:
