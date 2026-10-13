@@ -120,6 +120,18 @@ def frame_cache(cfg, imgsz, ids=None, rebuild=False):
     return frames
 
 
+def adv_frames(frames, delta):
+    """Apply the universal perturbation ONCE, ahead of time, and quantise to uint8 - as a camera
+    would deliver the perturbed scene. Clean and adversarial frames then go through identical
+    per-frame pre-processing, so the attack cannot add CPU work of its own (measured on the
+    Jetson: adding delta per frame cost +2.7 ms of pre-processing, an artifact)."""
+    d = np.ascontiguousarray(delta.transpose(1, 2, 0) * 255.0, dtype=np.float32)
+    out = np.empty(frames.shape, dtype=np.uint8)
+    for i in range(len(frames)):
+        out[i] = np.clip(np.rint(frames[i].astype(np.float32) + d), 0, 255).astype(np.uint8)
+    return out
+
+
 def to_input(frame_u8, delta=None):
     """uint8 HWC frame -> float32 NCHW in [0,1], optionally + perturbation (CHW, same size)."""
     x = frame_u8.astype(np.float32).transpose(2, 0, 1)[None] / 255.0

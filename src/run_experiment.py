@@ -19,7 +19,7 @@ import time
 import numpy as np
 
 from backends import make_backend
-from common import SCHEMA_VERSION, env_info, frame_cache, load_config, p, pin_to_cores, save_json, soc_temp_c
+from common import SCHEMA_VERSION, adv_frames, env_info, frame_cache, load_config, p, pin_to_cores, save_json, soc_temp_c
 import gzip
 import shutil
 from corunner import CoRunner
@@ -45,6 +45,7 @@ class Runner(object):
         self.frames = frame_cache(cfg, self.imgsz)
         dpath = a.delta or os.path.join(p(cfg["paths"]["perturbations"]), "%s_%d.npy" % (cfg["model"]["name"], self.imgsz))
         self.delta = np.load(dpath).astype(np.float32)
+        self.frames_adv = adv_frames(self.frames, self.delta)   # perturbation baked into the pixels
         a.backend = a.backend or cfg["runtime"]["backend"]
         self.be = make_backend(a.backend, a.model, dict(cfg["nms"]))
         self.common = dict(schema_version=SCHEMA_VERSION, device_id=cfg["device_id"], backend=a.backend,
@@ -82,7 +83,7 @@ class Runner(object):
                     model=self.model)
         status, n = "failed", 0
         try:
-            n = run_trial(self.be, self.frames, self.delta if inp == "adv" else None, mode, out + ".part", meta,
+            n = run_trial(self.be, self.frames_adv if inp == "adv" else self.frames, None, mode, out + ".part", meta,
                           n_frames=n_frames or st["closed_frames"], seconds=seconds or st["open_seconds"],
                           fps=self.cfg["deadline"]["fps"], queue_len=st["queue_len"], warmup=st["warmup_frames"])
             with open(out + ".part", "rb") as fi, gzip.open(out, "wb") as fo:   # standard: gzip CSV
