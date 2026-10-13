@@ -40,6 +40,27 @@ def _row(meta, k, img_idx, rel, start, done, info, depth, dropped, temp, t0):
     return r
 
 
+class TempSampler(object):
+    """SoC temperature read in a background thread every 2 s. Reading the Jetson's thermal zones
+    can block for ~0.5-1 s; doing it inside the frame loop (every 100 frames) stalled the
+    open-loop stream and caused bursts of deadline misses that had nothing to do with the attack."""
+
+    def __init__(self, period=2.0):
+        import threading
+        self.value, self.period = soc_temp_c(), period
+        self._stop = threading.Event()
+        self._t = threading.Thread(target=self._loop)
+        self._t.daemon = True
+        self._t.start()
+
+    def _loop(self):
+        while not self._stop.wait(self.period):
+            self.value = soc_temp_c()
+
+    def stop(self):
+        self._stop.set()
+
+
 def run_trial(backend, frames, delta, mode, out_csv, meta, n_frames=3000, seconds=300, fps=30,
               queue_len=4, warmup=300):
     """Run one trial and write its per-frame CSV. Returns the number of logged frames."""
@@ -50,13 +71,13 @@ def run_trial(backend, frames, delta, mode, out_csv, meta, n_frames=3000, second
     f = open(out_csv, "w")
     w = csv.DictWriter(f, fieldnames=COLUMNS, extrasaction="ignore")
     w.writeheader()
-    temp = soc_temp_c()
+    sampler = TempSampler()
+    temp = sampler.value
     t0 = now()
     logged = 0
     if mode == "closed":
         for k in range(n_frames):
-            if k % 100 == 0:
-                temp = soc_temp_c()
+            temp = sampler.value
             start = now()
             info, _ = backend.process(frames[k % n_img], delta)
             done = now()
@@ -82,15 +103,16 @@ def run_trial(backend, frames, delta, mode, out_csv, meta, n_frames=3000, second
                 time.sleep(max(0.0, t0 + nxt * period - now()))
                 continue
             k = q.popleft()
-            if k % 100 == 0:
-                temp = soc_temp_c()
+            temp = sampler.value
             start = now()
             info, _ = backend.process(frames[k % n_img], delta)
             done = now()
             w.writerow(_row(meta, k, k % n_img, t0 + k * period, start, done, info, len(q), 0, temp, t0))
             logged += 1
     else:
+        sampler.stop()
         raise ValueError(mode)
+    sampler.stop()
     f.close()
     return logged
 
