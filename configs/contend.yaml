@@ -43,7 +43,7 @@ nms:                     # Ultralytics predictor defaults (EVADE-compliant)
 
 attack:                  # re-implementation of the Phantom Sponges max-objects objective [1]
   eps: 0.0627            # L-infinity budget = 16/255 on the [0,1] network input
-  steps: 300
+  steps: 1500             # 2026-10-13: 300 -> 1500 (converged; candidates plateau from ~step 400)
   batch: 8
   lr: 0.01
   lambda_area: 10.0      # bounding-box area loss weight (Phantom Sponges)

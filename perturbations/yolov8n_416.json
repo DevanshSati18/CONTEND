@@ -2,12 +2,12 @@
   "model": "models/yolov8n.pt",
   "imgsz": 416,
   "eps": 0.0627,
-  "steps": 300,
+  "steps": 1500,
   "target_class": 2,
   "lambda_area": 10.0,
   "lr": 0.01,
   "n_train_images": 200,
-  "sha256": "aa5ec6b83603950c95523563f542e8adb776e15975fa79ce4f0747a27cbdc19a",
+  "sha256": "43f9918ad5dd5239ac0e411ba670be5f3140d0766dbd9d5e4f50bd0b1dce12c4",
   "history": [
     {
       "step": 0,
@@ -70,10 +70,250 @@
       "mean_candidates": 1321.0
     },
     {
-      "step": 299,
-      "loss": 1.2477999925613403,
-      "mean_candidates": 1457.625
+      "step": 300,
+      "loss": 1.2983354330062866,
+      "mean_candidates": 1332.875
+    },
+    {
+      "step": 325,
+      "loss": 1.791110634803772,
+      "mean_candidates": 1044.875
+    },
+    {
+      "step": 350,
+      "loss": 1.7354514598846436,
+      "mean_candidates": 1137.875
+    },
+    {
+      "step": 375,
+      "loss": 1.3650579452514648,
+      "mean_candidates": 1280.375
+    },
+    {
+      "step": 400,
+      "loss": 1.2073627710342407,
+      "mean_candidates": 1492.125
+    },
+    {
+      "step": 425,
+      "loss": 1.6195626258850098,
+      "mean_candidates": 1041.25
+    },
+    {
+      "step": 450,
+      "loss": 1.2930092811584473,
+      "mean_candidates": 1402.875
+    },
+    {
+      "step": 475,
+      "loss": 1.4766968488693237,
+      "mean_candidates": 1186.75
+    },
+    {
+      "step": 500,
+      "loss": 1.3657653331756592,
+      "mean_candidates": 1334.75
+    },
+    {
+      "step": 525,
+      "loss": 1.2787054777145386,
+      "mean_candidates": 1389.625
+    },
+    {
+      "step": 550,
+      "loss": 1.4855526685714722,
+      "mean_candidates": 1189.75
+    },
+    {
+      "step": 575,
+      "loss": 1.6244834661483765,
+      "mean_candidates": 1157.875
+    },
+    {
+      "step": 600,
+      "loss": 1.2568755149841309,
+      "mean_candidates": 1390.625
+    },
+    {
+      "step": 625,
+      "loss": 1.235213041305542,
+      "mean_candidates": 1489.375
+    },
+    {
+      "step": 650,
+      "loss": 1.682091474533081,
+      "mean_candidates": 1063.375
+    },
+    {
+      "step": 675,
+      "loss": 1.132131576538086,
+      "mean_candidates": 1586.5
+    },
+    {
+      "step": 700,
+      "loss": 1.2568995952606201,
+      "mean_candidates": 1530.0
+    },
+    {
+      "step": 725,
+      "loss": 1.327314853668213,
+      "mean_candidates": 1546.25
+    },
+    {
+      "step": 750,
+      "loss": 1.529662013053894,
+      "mean_candidates": 1160.125
+    },
+    {
+      "step": 775,
+      "loss": 1.1129486560821533,
+      "mean_candidates": 1625.375
+    },
+    {
+      "step": 800,
+      "loss": 1.3066798448562622,
+      "mean_candidates": 1443.25
+    },
+    {
+      "step": 825,
+      "loss": 1.2222120761871338,
+      "mean_candidates": 1474.875
+    },
+    {
+      "step": 850,
+      "loss": 1.2024298906326294,
+      "mean_candidates": 1453.0
+    },
+    {
+      "step": 875,
+      "loss": 1.6398367881774902,
+      "mean_candidates": 1231.75
+    },
+    {
+      "step": 900,
+      "loss": 1.244507908821106,
+      "mean_candidates": 1399.0
+    },
+    {
+      "step": 925,
+      "loss": 1.3174294233322144,
+      "mean_candidates": 1430.5
+    },
+    {
+      "step": 950,
+      "loss": 1.4801814556121826,
+      "mean_candidates": 1233.25
+    },
+    {
+      "step": 975,
+      "loss": 1.3014447689056396,
+      "mean_candidates": 1399.125
+    },
+    {
+      "step": 1000,
+      "loss": 1.1470481157302856,
+      "mean_candidates": 1564.125
+    },
+    {
+      "step": 1025,
+      "loss": 1.2090106010437012,
+      "mean_candidates": 1430.375
+    },
+    {
+      "step": 1050,
+      "loss": 1.6395931243896484,
+      "mean_candidates": 1104.375
+    },
+    {
+      "step": 1075,
+      "loss": 1.316199541091919,
+      "mean_candidates": 1321.375
+    },
+    {
+      "step": 1100,
+      "loss": 1.1639002561569214,
+      "mean_candidates": 1506.25
+    },
+    {
+      "step": 1125,
+      "loss": 1.4100418090820312,
+      "mean_candidates": 1234.75
+    },
+    {
+      "step": 1150,
+      "loss": 1.2771390676498413,
+      "mean_candidates": 1453.25
+    },
+    {
+      "step": 1175,
+      "loss": 1.4264585971832275,
+      "mean_candidates": 1347.5
+    },
+    {
+      "step": 1200,
+      "loss": 1.1862056255340576,
+      "mean_candidates": 1577.5
+    },
+    {
+      "step": 1225,
+      "loss": 1.2457753419876099,
+      "mean_candidates": 1500.5
+    },
+    {
+      "step": 1250,
+      "loss": 1.325502872467041,
+      "mean_candidates": 1394.25
+    },
+    {
+      "step": 1275,
+      "loss": 1.1868436336517334,
+      "mean_candidates": 1587.75
+    },
+    {
+      "step": 1300,
+      "loss": 1.2781552076339722,
+      "mean_candidates": 1433.5
+    },
+    {
+      "step": 1325,
+      "loss": 1.405972957611084,
+      "mean_candidates": 1232.625
+    },
+    {
+      "step": 1350,
+      "loss": 1.106713056564331,
+      "mean_candidates": 1618.375
+    },
+    {
+      "step": 1375,
+      "loss": 1.1823053359985352,
+      "mean_candidates": 1566.75
+    },
+    {
+      "step": 1400,
+      "loss": 1.2732213735580444,
+      "mean_candidates": 1363.75
+    },
+    {
+      "step": 1425,
+      "loss": 1.3707655668258667,
+      "mean_candidates": 1309.75
+    },
+    {
+      "step": 1450,
+      "loss": 1.2165147066116333,
+      "mean_candidates": 1448.0
+    },
+    {
+      "step": 1475,
+      "loss": 1.2367316484451294,
+      "mean_candidates": 1456.0
+    },
+    {
+      "step": 1499,
+      "loss": 1.2713438272476196,
+      "mean_candidates": 1464.25
     }
   ],
-  "seconds": 231.25883960723877
+  "seconds": 1167.482150554657
 }
