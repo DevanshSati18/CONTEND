@@ -195,7 +195,8 @@ def env_info():
     for path in ["/etc/nv_tegra_release", "/proc/device-tree/model"]:
         try:
             with open(path) as f:
-                info[os.path.basename(path)] = f.read().strip().replace("\x00", "")
+                key = "board" if path.endswith("model") else os.path.basename(path)   # not "model": clashes with the detector name
+                info[key] = f.read().strip().replace("\x00", "")
         except Exception:
             pass
     try:

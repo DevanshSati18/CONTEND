@@ -430,7 +430,12 @@ def step_main(ctx):
     banner("7/8  Main blocks, %d independent sessions" % ctx.a.sessions)
     cfg, lock = ctx.cfg(), read_lock(ctx)
     mf = model_file(cfg, "%s_%s" % (cfg["model"]["name"], cfg["model"]["imgsz"]))
-    say("estimated time left: %.1f h (rerun the same command to resume after any stop)" % eta_hours(ctx, cfg, lock))
+    eta = eta_hours(ctx, cfg, lock)
+    say("estimated time left: %.1f h (rerun the same command to resume after any stop)" % eta)
+    if eta > ctx.a.max_hours and not ctx.a.force:
+        die("the plan needs %.0f h (> --max-hours %.0f). Usually the platform is unstable (heat, power: see "
+            "derived/g3.json and `vcgencmd get_throttled`) or runs are too long. Fix that, or use --sessions 1 / "
+            "--max-hours N." % (eta, ctx.a.max_hours))
     blocks = lock["blocks"]
     for s in range(1, lock["sessions"] + 1):
         runs_sess = dict((b, lock["config"]["experiment"]["blocks"][b]["runs_per_cell"]) for b in blocks)
@@ -595,6 +600,7 @@ def main():
     ap.add_argument("--sessions", type=int, default=3, help="independent repetitions of every block (default 3)")
     ap.add_argument("--blocks", nargs="+", default=["E1", "E2", "E3"], help="blocks to run (E4 optional)")
     ap.add_argument("--status", action="store_true", help="show progress and time left, run nothing")
+    ap.add_argument("--max-hours", type=float, default=30, help="stop before the main blocks if they would take longer")
     ap.add_argument("--push", action="store_true", help="commit + push results/<device> at the end")
     ap.add_argument("--push-each", action="store_true", help="also commit + push after every session")
     ap.add_argument("--force", action="store_true", help="continue even if a gate fails")

@@ -1,0 +1,132 @@
+{
+  "python": "3.13.5",
+  "time": "2026-10-12T20:55:44",
+  "numpy": "2.5.2",
+  "torch": "2.14.1+cpu",
+  "torchvision": "0.29.1+cpu",
+  "onnxruntime": "1.31.0",
+  "cv2": "5.0.0",
+  "model": "models/yolov8n_320.onnx",
+  "config": {
+    "project": "CONTEND",
+    "version": "1.0",
+    "paths": {
+      "coco_images": "data/coco/val2017",
+      "coco_annotations": "data/coco/annotations/instances_val2017.json",
+      "subset_ids": "data/subset/image_ids.txt",
+      "subset_cache": "data/subset/frames_{imgsz}.npy",
+      "models": "models",
+      "perturbations": "perturbations",
+      "raw": "results/raspberry_pi/raw",
+      "derived": "results/raspberry_pi/derived",
+      "figures": "results/raspberry_pi/figures"
+    },
+    "subset": {
+      "n_images": 500,
+      "n_attack_train": 200,
+      "seed": 20261009
+    },
+    "runtime": {
+      "backend": "ort",
+      "model_ext": "onnx",
+      "precision": "fp32"
+    },
+    "model": {
+      "name": "yolov8n",
+      "imgsz": 320,
+      "precision": "fp16"
+    },
+    "nms": {
+      "conf_thres": 0.25,
+      "iou_thres": 0.7,
+      "max_det": 300,
+      "max_nms": 30000,
+      "agnostic": false,
+      "time_limit_s": 2.05,
+      "device": "cpu"
+    },
+    "attack": {
+      "eps": 0.0627,
+      "steps": 300,
+      "batch": 8,
+      "lr": 0.01,
+      "lambda_area": 10.0,
+      "target_conf": 0.25
+    },
+    "deadline": {
+      "fps": 2
+    },
+    "stream": {
+      "queue_len": 4,
+      "warmup_frames": 300,
+      "closed_frames": 3000,
+      "open_seconds": 300
+    },
+    "platform": {
+      "detector_cores": [
+        0,
+        1
+      ],
+      "corunner_cores": [
+        2,
+        3
+      ],
+      "cooldown_s": 120,
+      "max_start_temp_c": 65
+    },
+    "contention": {
+      "none": {
+        "kind": "none"
+      },
+      "mem_low": {
+        "kind": "bw",
+        "instances": 1,
+        "buffer_mb": 256
+      },
+      "mem_high": {
+        "kind": "bw",
+        "instances": 2,
+        "buffer_mb": 256
+      },
+      "cpu": {
+        "kind": "cpu",
+        "instances": 2
+      }
+    },
+    "experiment": {
+      "seed": 20261011,
+      "blocks": {
+        "E1": {
+          "mode": "closed",
+          "contention": "mem_high",
+          "runs_per_cell": 8
+        },
+        "E2": {
+          "mode": "closed",
+          "contention": "cpu",
+          "runs_per_cell": 8
+        },
+        "E3": {
+          "mode": "open",
+          "contention": "mem_high",
+          "runs_per_cell": 4
+        },
+        "E4": {
+          "mode": "closed",
+          "contention": "mem_low",
+          "runs_per_cell": 6
+        }
+      }
+    },
+    "analysis": {
+      "equivalence_margin": 0.05,
+      "bootstrap": 10000,
+      "trim": 0.05
+    },
+    "device_label": "Raspberry Pi (model set by scripts/40_pi_setup.sh), 4x Cortex-A CPU",
+    "platform_class": "edge_cpu",
+    "device_id": "raspberry_pi"
+  },
+  "delta": "/home/striveslyash/Desktop/CONTEND/perturbations/yolov8n_320.npy",
+  "backend": "ort"
+}
