@@ -8,6 +8,8 @@ results/<device>/. Re-running the same command resumes where it stopped.
   python3 runscript.py --smoke       # 5-minute end-to-end code check (tiny settings)
 
   python3 runscript.py --prepare     # Mac/host, once: ONNX models + attack perturbations to commit
+  python3 runscript.py --train-attack --sizes 416 --steps 1500
+                                     # any PC with a GPU (or CPU): (re)train the adversarial perturbation
   python3 runscript.py --compile     # Mac: git pull, analyse every device, combined tables + figures
   python3 runscript.py --pi --status # what is done, what is left, time estimate
 
@@ -590,6 +592,53 @@ def prepare_mode(a):
     say("  git add models/*.onnx perturbations data/subset/*.txt && git commit -m 'shared assets' && git push")
 
 
+def train_attack_mode(a):
+    """(Re)train the universal adversarial perturbation on any host (GPU used when present: NVIDIA
+    CUDA or Apple MPS; CPU works but is slow). Resumable: stop with Ctrl-C and run again.
+    Writes perturbations/<model>_<size>.npy + .json (steps, sha256, training curve); the previous
+    file is kept as <model>_<size>_prev.npy. Then checks the new perturbation on 200 held-out images."""
+    ctx = Ctx("dev_vm", a)
+    banner("Train the adversarial perturbation: %s @ %s, %d steps" % (" ".join(a.models), a.sizes, a.steps))
+    step_environment(ctx)
+    rc, _ = ctx.py_run("-c", "import ultralytics", check=False, quiet=True)
+    if rc != 0:
+        ctx.py_run("-m", "pip", "install", "ultralytics", "onnx", "onnxslim")
+    step_images(ctx, with_attack=True)               # 500 eval + 200 attack-training images
+    try:
+        from urllib.request import urlretrieve
+    except ImportError:
+        from urllib import urlretrieve
+    for m in a.models:
+        pt = os.path.join(ROOT, "models", m + ".pt")
+        if not os.path.exists(pt):
+            say("downloading %s.pt" % m)
+            urlretrieve(PT_URL % m, pt)
+        for s in a.sizes:
+            base = os.path.join(ROOT, "perturbations", "%s_%d" % (m, s))
+            ckpt = base + ".ckpt.pt"
+            info = jload(base + ".json", {})
+            if info.get("steps") == a.steps and not os.path.exists(ckpt) and not a.force:
+                say("%s_%d already trained for %d steps (sha %s) - use --force to retrain"
+                    % (m, s, a.steps, str(info.get("sha256", ""))[:16]))
+                continue
+            if os.path.exists(base + ".npy") and not os.path.exists(ckpt):
+                shutil.copy(base + ".npy", base + "_prev.npy")
+                if os.path.exists(base + ".json"):
+                    shutil.copy(base + ".json", base + "_prev.json")
+                say("previous perturbation kept as %s_%d_prev.npy" % (m, s))
+            env = dict(ctx.env, PYTORCH_ENABLE_MPS_FALLBACK="1")
+            ctx.py_run("src/attack_uap.py", "--model", "models/%s.pt" % m, "--imgsz", str(s),
+                       "--steps", str(a.steps), "--out", base + ".npy", env=env)
+            onnx = os.path.join("models", "%s_%d.onnx" % (m, s))
+            if not os.path.exists(os.path.join(ROOT, onnx)):
+                ctx.py_run("src/export_models.py", "--models", m, "--sizes", str(s))
+            ctx.py_run("src/check_workload.py", "--backend", "torch", "--model", "models/%s.pt" % m, "--imgsz", str(s),
+                       "--delta", base + ".npy", "--n", "200", "--out", base + "_host_g1.json", check=False)
+    say("Done. Commit and push the new perturbation, then git pull on the Jetson:")
+    say("  git add perturbations/*.npy perturbations/*.json && git commit -m 'perturbation %d steps' && git push origin master"
+        % a.steps)
+
+
 def compile_mode(a):
     """Mac: pull every device's results, analyse each device, combine."""
     banner("Compile all devices")
@@ -620,6 +669,7 @@ def main():
     g.add_argument("--dev", action="store_true", help="development machine (never evidence) -> results/dev_vm/")
     g.add_argument("--smoke", action="store_true", help="5-minute end-to-end code check")
     g.add_argument("--prepare", action="store_true", help="host: ONNX models + perturbations to commit")
+    g.add_argument("--train-attack", action="store_true", help="any host: (re)train the adversarial perturbation")
     g.add_argument("--compile", action="store_true", help="host: pull, analyse all devices, combine")
     g.add_argument("--profile", default=None, help="advanced: any configs/devices/<name>.yaml (e.g. smoke_rs)")
     ap.add_argument("--instances", type=int, default=1, help="complete instances to run back to back (default 1)")
@@ -636,7 +686,8 @@ def main():
     ap.add_argument("--no-pull", action="store_true", help="--compile without git pull")
     ap.add_argument("--include-smoke", action="store_true", help="--compile: also analyse results/smoke")
     ap.add_argument("--models", nargs="+", default=["yolov8n"], help="--prepare: models")
-    ap.add_argument("--sizes", nargs="+", type=int, default=[320, 416, 640], help="--prepare: input sizes")
+    ap.add_argument("--sizes", nargs="+", type=int, default=[320, 416, 640], help="--prepare / --train-attack: input sizes")
+    ap.add_argument("--steps", type=int, default=1500, help="--train-attack: optimisation steps (default 1500)")
     a = ap.parse_args()
     if a.instances < 1 or a.runs < 1:
         die("--instances and --runs must be >= 1")
@@ -645,6 +696,8 @@ def main():
         sys.exit(subprocess.call(["bash", "scripts/smoke_test.sh"], cwd=ROOT))
     if a.prepare:
         return prepare_mode(a)
+    if a.train_attack:
+        return train_attack_mode(a)
     if a.compile:
         return compile_mode(a)
     dev = a.profile or DEVICES["pi" if a.pi else "nvidia" if a.nvidia else "dev"]

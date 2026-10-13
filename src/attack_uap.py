@@ -64,7 +64,15 @@ def main():
     ac = cfg["attack"]
     seeded(cfg["subset"]["seed"])
     torch.manual_seed(cfg["subset"]["seed"])
-    dev = a.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    if a.device:
+        dev = a.device
+    elif torch.cuda.is_available():
+        dev = "cuda"                                # NVIDIA GPU (fastest)
+    elif getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+        dev = "mps"                                 # Apple-silicon GPU
+    else:
+        dev = "cpu"
+    print("attack: device %s" % dev)
     from ultralytics import YOLO
     model = YOLO(a.model).model.to(dev).eval()
     for q in model.parameters():

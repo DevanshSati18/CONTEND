@@ -28,3 +28,5 @@ results/smoke/
 results/smoke_rs/
 setup_*.log
 torchvision_build.log
+perturbations/*_prev.npy
+perturbations/*_prev.json
