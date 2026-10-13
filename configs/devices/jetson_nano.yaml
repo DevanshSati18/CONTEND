@@ -2,7 +2,7 @@
 device_label: "NVIDIA Jetson Nano 4GB (Maxwell GPU, 4x Cortex-A57, shared LPDDR4)"
 platform_class: edge_gpu_soc
 runtime: {backend: trt, model_ext: engine, precision: fp16}
-platform: {detector_cores: [0, 1], corunner_cores: [2, 3]}
+platform: {detector_cores: [0, 1], corunner_cores: [2, 3], cooldown_s: 60}
 # 2026-10-13: G1 failed with NMS on the GPU (candidates x32 but NMS +0.7 ms median: the Maxwell
 # GPU's NMS is dominated by fixed launch/sync cost). Pre-planned fallback: NMS on the CPU.
 nms: {device: cpu}

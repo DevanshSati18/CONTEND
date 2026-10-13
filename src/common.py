@@ -149,6 +149,15 @@ def soc_temp_c():
     for z in os.listdir(base):
         f = os.path.join(base, z, "temp")
         try:
+            with open(os.path.join(base, z, "type")) as fh:
+                kind = fh.read().strip().lower()
+            # Jetson Nano: PMIC-Die reports a fixed 100 C and thermal-fan-est a fixed/estimated
+            # value - neither is a die temperature (the Nano logged a constant 50.0 C)
+            if "pmic" in kind or "fan" in kind or "est" in kind:
+                continue
+        except Exception:
+            pass
+        try:
             with open(f) as fh:
                 t = int(fh.read().strip()) / 1000.0
             best = t if best != best else max(best, t)
