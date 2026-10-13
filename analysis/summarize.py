@@ -17,7 +17,7 @@ import pandas as pd
 from scipy import stats
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-from common import load_config, p  # noqa: E402
+from common import load_config, p, raw_dirs  # noqa: E402
 
 STAGES = ["t_pre_ms", "t_inf_ms", "t_nms_ms", "t_d2h_ms"]
 
@@ -61,10 +61,11 @@ def main():
     ap.add_argument("--include", nargs="*", default=None, help="blocks to include (default: all except G2/PILOT)")
     a = ap.parse_args()
     cfg = load_config()
-    raw = a.raw or p(cfg["paths"]["raw"])
+    raws = [a.raw] if a.raw else raw_dirs(cfg)
     deadline = 1000.0 / cfg["deadline"]["fps"]
     rows = []
-    files = sorted(glob.glob(os.path.join(raw, "*", "*.csv")) + glob.glob(os.path.join(raw, "*", "*.csv.gz")))
+    files = sorted(sum([glob.glob(os.path.join(r, "*", "*.csv")) + glob.glob(os.path.join(r, "*", "*.csv.gz"))
+                        for r in raws], []))
     for fn in files:
         block = os.path.basename(os.path.dirname(fn))
         if a.include is not None and block not in a.include:
@@ -83,9 +84,9 @@ def main():
         row.update(summarize_run(df, deadline, cfg["analysis"]["trim"]))
         rows.append(row)
     out = pd.DataFrame(rows)
-    man = os.path.join(raw, "runs.csv")
-    if os.path.exists(man) and len(out):
-        m = pd.read_csv(man).drop_duplicates("run_id", keep="last")
+    mans = [pd.read_csv(os.path.join(r, "runs.csv")) for r in raws if os.path.exists(os.path.join(r, "runs.csv"))]
+    if mans and len(out):
+        m = pd.concat(mans, ignore_index=True).drop_duplicates("run_id", keep="last")
         out = out.merge(m[["run_id", "order", "start_temp_c"]], on="run_id", how="left")
     if len(out):   # a block's contention type = the co-runner used in its loaded cells (C, D)
         out["contention"] = out.groupby("block")["contention_run"].transform(

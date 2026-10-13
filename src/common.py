@@ -68,7 +68,28 @@ def load_config(path=None):
     cfg["device_id"] = dev
     for k in ("raw", "derived", "figures"):
         cfg["paths"][k] = cfg["paths"][k].replace("{device}", dev)
+    # an INSTANCE is one complete pass of the pipeline (gates + every condition once); its raw data
+    # and gate results live in results/<device>/instance<k>/. Without CONTEND_INSTANCE the paths
+    # point at the device level, where the analysis pools all instances.
+    inst = os.environ.get("CONTEND_INSTANCE")
+    cfg["instance"] = int(inst) if inst else None
+    if inst:
+        base = os.path.join("results", dev, "instance%d" % int(inst))
+        cfg["paths"]["raw"] = os.path.join(base, "raw")
+        cfg["paths"]["derived"] = os.path.join(base, "derived")
     return cfg
+
+
+def raw_dirs(cfg):
+    """Every raw folder of this device: the instance folders (plus a legacy device-level raw/)."""
+    import glob
+    dev = os.path.join(ROOT, "results", cfg["device_id"])
+    if cfg.get("instance"):
+        return [p(cfg["paths"]["raw"])]
+    out = sorted(glob.glob(os.path.join(dev, "instance*", "raw")),
+                 key=lambda d: int(os.path.basename(os.path.dirname(d))[8:] or 0))
+    legacy = p(cfg["paths"]["raw"])
+    return ([legacy] if os.path.isdir(legacy) else []) + out
 
 
 def p(rel):

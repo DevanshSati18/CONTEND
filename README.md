@@ -22,8 +22,8 @@ bash setup.sh
 # on the Raspberry Pi / Jetson Nano: clone and run everything with ONE command
 git clone https://github.com/<you>/CONTEND.git && cd CONTEND      # private repo: `gh auth login` first
 tmux new -s contend                       # keeps running if the SSH session drops (Ctrl-b d to detach)
-python3 runscript.py --pi                 # Raspberry Pi   -> results/raspberry_pi/
-python3 runscript.py --nvidia             # Jetson Nano    -> results/jetson_nano/
+python3 runscript.py --pi                 # Raspberry Pi: one INSTANCE -> results/raspberry_pi/instance<k>/
+python3 runscript.py --nvidia             # Jetson Nano:  one INSTANCE -> results/jetson_nano/instance<k>/
 python3 runscript.py --pi --status        # progress + time left, from any other terminal
 python3 runscript.py --pi --push          # same run, then commits + pushes results/raspberry_pi/
 
@@ -45,14 +45,12 @@ command resumes** after a crash, reboot or Ctrl-C (finished runs are never repea
 | 7 main | E1-E3 repeated in `--sessions N` (default 3) independent sessions | `raw/` |
 | 8 analyse | statistics, figures and `REPORT.md`, refreshed after every session | `derived/`, `figures/` |
 
-**Why sessions (robustness).** One run's mean latency moves a little every time (thermal state,
-OS noise, memory layout), and a whole sitting can drift (a warmer room, a reboot). So the runner
-repeats every block in N independent sessions, each in a fresh seeded random order, and spreads the
-required runs per cell (max of the G3 requirement and the plan) over them, so the total time stays
-about the same. The report gives the pooled answer (pre-registered run-level bootstrap), the ratio
-of every session on its own, the between-session SD, and a two-stage bootstrap that resamples whole
-sessions; a decision is marked **robust** only if both bootstraps agree. More sessions later:
-`python3 runscript.py --pi --sessions 4` adds session 4 and keeps 1-3.
+**Instances (robustness).** One command = one INSTANCE: the gates G1-G3 and then every
+condition of E1-E3 measured once, saved in `results/<device>/instance<k>/`. Run the same command
+again for instance 2, 3, ... (or `--instances 5` back to back). Each instance re-checks the gates,
+so a bad pass is visible in the report's per-instance table. The analysis treats every instance as
+one complete, paired replicate of the 2x2 and resamples whole instances for the confidence
+interval; a decision is marked **robust** only with >= 3 instances that all agree. Plan on 5.
 
 Each device writes only to `results/<device>/`, so pushes from the Pi and the Jetson never conflict.
 Shared assets are made once on the Mac with `python3 runscript.py --prepare` (ONNX models and

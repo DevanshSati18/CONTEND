@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-from common import load_config, p  # noqa: E402
+from common import load_config, p, raw_dirs  # noqa: E402
 
 STAGES = ["t_pre_ms", "t_inf_ms", "t_nms_ms", "t_d2h_ms", "other_ms"]
 STAGE_LABEL = {"t_pre_ms": "Pre-process", "t_inf_ms": "Inference", "t_nms_ms": "NMS",
@@ -64,6 +64,11 @@ def boot(cm, fn, n, seed, cluster=False):
     rng = np.random.RandomState(seed)
     sess = sorted(set().union(*[set(cm[c]["session"]) for c in "ABCD"]))
     idx = {c: {s: np.where(cm[c]["session"].values == s)[0] for s in sess} for c in "ABCD"}
+    if not cluster and any(0 < len(idx[c][s]) < 2 for c in "ABCD" for s in sess):
+        # one run per cell per instance: each instance is one complete, paired replicate of the
+        # 2x2, so the instance is the unit - resample whole instances (stratifying would freeze
+        # every resample into a zero-width interval; pooling runs would break the pairing).
+        cluster = True
     out = []
     for _ in range(n):
         pick = [sess[i] for i in rng.randint(0, len(sess), len(sess))] if cluster else sess
@@ -123,7 +128,8 @@ def rq1_rq2(df, cfg, nboot):
             def side(r):
                 return "in" if abs(np.log(r)) < np.log(1 + m_) else ("above" if r > 1 else "below")
             row["robust_across_sessions"] = bool(dec != "inconclusive" and row["decision_cluster"] == dec
-                                                 and all(side(x) == side(row["ratio"]) for x in row["ratio_by_session"]))
+                                                 and all(side(x) == side(row["ratio"]) for x in row["ratio_by_session"])
+                                                 and len(row["sessions_complete"]) >= 3)
         res1.append(row)
         for s in STAGES:
             def ks(sm, s=s):
@@ -146,7 +152,7 @@ def session_robustness(cm, nboot, a_adj, m):
     - a two-stage (session, then run) bootstrap CI and the decision it gives,
     - robust = the pooled decision does not change under the two-stage bootstrap."""
     sess = sorted(set().union(*[set(cm[c]["session"]) for c in "ABCD"]))
-    full = [s for s in sess if all((cm[c]["session"] == s).sum() >= 2 for c in "ABCD")]
+    full = [s for s in sess if all((cm[c]["session"] == s).sum() >= 1 for c in "ABCD")]
     out = dict(n_sessions=len(sess), sessions_complete=full, ratio_by_session=[], ratio_ci_by_session=[],
                decision_by_session=[], between_session_sd_pct=None, ratio_ci_cluster=None,
                decision_cluster=None, robust_across_sessions=None)
@@ -154,11 +160,15 @@ def session_robustness(cm, nboot, a_adj, m):
     for s in full:
         sub = {c: cm[c][cm[c]["session"] == s].reset_index(drop=True) for c in "ABCD"}
         Rs = stat_R(sub)[0]
-        tost, two, dec = r_test(sub, max(1000, nboot // 5), 11 + s, a_adj, m)
         logs.append(Rs)
         out["ratio_by_session"].append(float(np.exp(Rs)))
-        out["ratio_ci_by_session"].append([float(np.exp(two[0])), float(np.exp(two[1]))])
-        out["decision_by_session"].append(dec)
+        if all(len(sub[c]) >= 2 for c in "ABCD"):
+            tost, two, dec = r_test(sub, max(1000, nboot // 5), 11 + s, a_adj, m)
+            out["ratio_ci_by_session"].append([float(np.exp(two[0])), float(np.exp(two[1]))])
+            out["decision_by_session"].append(dec)
+        else:   # one run per cell in this instance: a point estimate, no interval of its own
+            out["ratio_ci_by_session"].append(None)
+            out["decision_by_session"].append("single run per cell")
     if len(logs) >= 2:
         out["between_session_sd_pct"] = float(100 * np.std(logs, ddof=1))
         sub = {c: cm[c][cm[c]["session"].isin(full)].reset_index(drop=True) for c in "ABCD"}
@@ -328,14 +338,14 @@ def main():
     pd.DataFrame(r3).to_csv(os.path.join(outdir, "rq3_deadlines.csv"), index=False)
     figdir = a.figdir or p(cfg["paths"]["figures"])
     figures(r1, r2, figdir, a.raw)
-    trace_figure(a.raw or p(cfg["paths"]["raw"]), figdir, cfg["deadline"]["fps"])
+    trace_figure(a.raw or (raw_dirs(cfg) or [p(cfg["paths"]["raw"])])[0], figdir, cfg["deadline"]["fps"])
     print("\nRQ1  measured vs stage-wise predicted latency of cell D")
     for r in r1:
         print("  %-9s  runs/cell %d  T_D %.2f ms  predicted %.2f ms  ratio %.3f  95%% CI %.3f-%.3f  -> %s" % (
             r["contention"], r["runs_per_cell"], r["T_D"], r["T_D_pred"], r["ratio"],
             r["ratio_ci_two_sided"][0], r["ratio_ci_two_sided"][1], r["decision"]))
         if r.get("n_sessions", 1) > 1:
-            print("             sessions %d: ratio %s; between-session SD %s; two-stage CI %s -> %s; robust: %s" % (
+            print("             instances %d: ratio %s; between-session SD %s; two-stage CI %s -> %s; robust: %s" % (
                 r["n_sessions"], ", ".join("%.3f" % v for v in r["ratio_by_session"]),
                 ("%.2f%%" % r["between_session_sd_pct"]) if r["between_session_sd_pct"] is not None else "n/a",
                 ("%.3f-%.3f" % tuple(r["ratio_ci_cluster"])) if r["ratio_ci_cluster"] else "n/a",

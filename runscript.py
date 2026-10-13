@@ -2,7 +2,7 @@
 """CONTEND: one command runs the whole study on one device and stores its results in
 results/<device>/. Re-running the same command resumes where it stopped.
 
-  python3 runscript.py --pi          # Raspberry Pi            -> results/raspberry_pi/
+  python3 runscript.py --pi          # Raspberry Pi: one complete INSTANCE -> results/raspberry_pi/instance<k>/
   python3 runscript.py --nvidia      # Jetson Nano             -> results/jetson_nano/
   python3 runscript.py --dev         # Mac / dev VM (dry run)  -> results/dev_vm/  (never evidence)
   python3 runscript.py --smoke       # 5-minute end-to-end code check (tiny settings)
@@ -11,9 +11,13 @@ results/<device>/. Re-running the same command resumes where it stopped.
   python3 runscript.py --compile     # Mac: git pull, analyse every device, combined tables + figures
   python3 runscript.py --pi --status # what is done, what is left, time estimate
 
-Useful options: --sessions N (independent repetitions of every block, default 3), --push (commit
-and push this device's results at the end), --force (continue after a failed gate), --skip-platform
-(no sudo clock/governor settings; not for real data), --blocks E1 E2 E3.
+An INSTANCE is one complete pass: gates G1-G3, then every condition of E1-E3 measured once, recorded
+in results/<device>/instance<k>/. Each new command adds the next instance (instance1, instance2, ...);
+the device report averages over all instances, and every instance re-checks the gates.
+
+Useful options: --instances N (run N instances back to back), --runs R (runs per condition per
+instance, default 1), --push / --push-each (commit and push after the last / every instance),
+--force (continue after a failed gate), --skip-platform (no sudo clock settings; test only).
 
 Steps for a device (each one is skipped when its output already exists):
   1 environment   packages (runs the device setup script once), co-runner binaries
@@ -21,9 +25,9 @@ Steps for a device (each one is skipped when its output already exists):
   3 images        the 500 seeded COCO evaluation images (downloaded one by one, ~80 MB)
   4 models        committed ONNX + perturbations; TensorRT engines on the Jetson
   5 select        50-70 % deadline rule -> model, input size, FPS (written to the lock file)
-  6 gates         G1 workload, G2 contention, G3 pilot -> runs per cell; lock is frozen
-  7 main          blocks E1-E3, repeated for N sessions in a fresh random order each time
-  8 analyse       per-device statistics, figures and REPORT.md after every session
+  6 gates         G1 workload, G2 contention, G3 pilot, for THIS instance (config frozen at instance 1)
+  7 main          blocks E1-E3, every condition once (or --runs R), in a fresh random order
+  8 analyse       statistics over all instances, figures and REPORT.md after every instance
 
 Uses only the Python standard library itself (it runs before the environment exists, and on the
 Jetson's Python 3.6); the pipeline steps run in the device's environment.
@@ -122,9 +126,23 @@ class Ctx(object):
         self.dev, self.a = device, args
         self.res = os.path.join(ROOT, "results", device)
         self.der = os.path.join(self.res, "derived")
+        self.raw = os.path.join(self.res, "raw")
         self.lock_path = os.path.join(self.res, "locked_config.yaml")
         self.py = self.pick_python()
         self.env = dict(os.environ, CONTEND_DEVICE=device, PYTHONUNBUFFERED="1", PYTHONWARNINGS="ignore")
+        self.env.pop("CONTEND_INSTANCE", None)
+        self.env_device = dict(self.env)          # device level: analysis pools all instances
+        self.inst = None
+
+    def set_instance(self, k):
+        self.inst = k
+        self.inst_dir = os.path.join(self.res, "instance%d" % k)
+        self.der = os.path.join(self.inst_dir, "derived")
+        self.raw = os.path.join(self.inst_dir, "raw")
+        self.env = dict(self.env_device, CONTEND_INSTANCE=str(k))
+        for d in (self.der, self.raw, os.path.join(self.inst_dir, "logs")):
+            if not os.path.isdir(d):
+                os.makedirs(d)
 
     def pick_python(self):
         if os.environ.get("CONTEND_PYTHON"):
@@ -335,18 +353,6 @@ def step_select(ctx):
         name, size, fps, best["mean_ms"], 100 * share, "" if rule else "  [50-70 % rule not met: closest; note it in CHANGELOG]"))
 
 
-def plan_runs(cfg, g3, sessions, blocks):
-    """Runs per cell per session. Total per cell = max(G3 requirement, configured runs_per_cell),
-    spread over the sessions (at least 2 per session so every session can be analysed alone)."""
-    need = int((g3 or {}).get("runs_per_cell_needed", 6))
-    plan = {}
-    for b in blocks:
-        spec = cfg["experiment"]["blocks"][b]
-        total = max(need, int(spec["runs_per_cell"])) if spec["mode"] == "closed" else int(spec["runs_per_cell"])
-        plan[b] = max(2, int(math.ceil(total / float(sessions))))
-    return plan
-
-
 def step_gates(ctx):
     banner("6/8  Gates G1 (workload), G2 (contention), G3 (pilot)")
     cfg = ctx.cfg()
@@ -362,7 +368,7 @@ def step_gates(ctx):
     if not os.path.exists(os.path.join(ctx.der, "g2.json")):
         ctx.py_run("src/run_experiment.py", "g2", "--model", mf)
     if not os.path.exists(os.path.join(ctx.der, "g3.json")):
-        ctx.py_run("src/run_experiment.py", "pilot", "--runs", "3", "--model", mf)
+        ctx.py_run("src/run_experiment.py", "pilot", "--runs", "2", "--model", mf)
     g1, g2, g3 = (jload(os.path.join(ctx.der, n), {}) for n in ("g1_device.json", "g2.json", "g3.json"))
     fails = []
     if not g1.get("G1_pass"):
@@ -382,83 +388,82 @@ def step_gates(ctx):
         report(ctx)
         die("gate failed: %s.\nSee README 'If a gate fails' (e.g. nms.device: cpu, stronger co-runner). "
             "Re-run with --force to continue anyway (record it in docs/CHANGELOG.md)." % "; ".join(fails))
-    # freeze: this is the pre-registration point for this device
+    # record this instance's gates; the configuration is frozen once, at the first instance
+    with open(os.path.join(ctx.inst_dir, "gates.json"), "w") as f:
+        json.dump(dict(instance=ctx.inst, G1_pass=bool(g1.get("G1_pass")), candidate_ratio=g1.get("candidate_ratio"),
+                       nms_increase_ms=g1.get("nms_increase_ms_mean"), nms_increase_ci95=g1.get("nms_increase_ms_ci95"),
+                       G2=dict((k, dict(slowdown=v.get("slowdown"), passed=v.get("G2_pass"))) for k, v in (g2 or {}).items()),
+                       G3_worst_cv=max([c["cv"] for c in g3.get("cells", [])] or [None]), forced=bool(fails),
+                       time=datetime.datetime.now().isoformat(timespec="seconds")), f, indent=2)
     lock = read_lock(ctx)
-    blocks = ctx.a.blocks
-    if not lock.get("frozen_at") or ctx.a.sessions != lock.get("sessions") or sorted(blocks) != sorted(lock.get("blocks", [])):
-        plan = plan_runs(cfg, g3, ctx.a.sessions, blocks)
-        if lock.get("frozen_at"):   # keep the frozen per-session runs; only the session count / blocks change
-            old = lock["config"].get("experiment", {}).get("blocks", {})
-            plan = dict((b, int(old[b]["runs_per_cell"]) if b in old else plan[b]) for b in blocks)
-            lock.setdefault("changes", "")
-            lock["changes"] = (lock["changes"] + " | " if lock["changes"] else "") + "%s: sessions %s -> %d, blocks %s" % (
-                datetime.date.today().isoformat(), lock.get("sessions"), ctx.a.sessions, " ".join(blocks))
-        lock["config"]["experiment"] = dict(blocks=dict((b, dict(runs_per_cell=plan[b])) for b in blocks))
-        lock["sessions"], lock["blocks"] = ctx.a.sessions, blocks
-        lock["g3_runs_needed"] = g3.get("runs_per_cell_needed")
-        lock["gates"] = dict(G1=bool(g1.get("G1_pass")), G2=dict((k, v.get("G2_pass")) for k, v in (g2 or {}).items()),
-                             forced=bool(fails))
-        lock.setdefault("frozen_at", datetime.datetime.now().isoformat(timespec="seconds"))
-        lock.setdefault("git_commit", git("rev-parse", "--short", "HEAD") or "none")
+    if not lock.get("frozen_at"):
+        lock["config"]["experiment"] = dict(blocks=dict((b, dict(runs_per_cell=ctx.a.runs)) for b in ctx.a.blocks))
+        lock["blocks"], lock["runs_per_instance"] = ctx.a.blocks, ctx.a.runs
+        lock["frozen_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+        lock["git_commit"] = git("rev-parse", "--short", "HEAD") or "none"
         write_lock(ctx, lock)
-    say("frozen: %d sessions x {%s} runs per cell per session" % (
-        lock["sessions"], ", ".join("%s: %d" % (b, v["runs_per_cell"]) for b, v in sorted(lock["config"]["experiment"]["blocks"].items()))))
+    say("instance %d: gates recorded; every condition of %s measured %d time(s)" % (
+        ctx.inst, " ".join(lock["blocks"]), lock["runs_per_instance"]))
 
 
-def done_runs(ctx, block, session):
-    return len(glob.glob(os.path.join(ctx.res, "raw", block, "%s_*_s%d_r*.csv.gz" % (block, session))))
+def done_runs(ctx, block, inst):
+    raw = os.path.join(ctx.res, "instance%d" % inst, "raw", block)
+    return len(glob.glob(os.path.join(raw, "%s_*_s%d_r*.csv.gz" % (block, inst))))
 
 
-def eta_hours(ctx, cfg, lock, remaining_only=True):
-    g3 = jload(os.path.join(ctx.der, "g3.json"), {})
+def instance_complete(ctx, k):
+    return os.path.exists(os.path.join(ctx.res, "instance%d" % k, "COMPLETE"))
+
+
+def instances(ctx):
+    ks = []
+    for d in glob.glob(os.path.join(ctx.res, "instance*")):
+        try:
+            ks.append(int(os.path.basename(d)[8:]))
+        except ValueError:
+            pass
+    return sorted(ks)
+
+
+def eta_hours(ctx, cfg, lock, k):
+    g3 = jload(os.path.join(ctx.res, "instance%d" % k, "derived", "g3.json"), {})
     ms = [c["mean_ms"] for c in g3.get("cells", [])] or [100.0]
     lat = sum(ms) / len(ms) / 1000.0
     st, pl = cfg["stream"], cfg["platform"]
-    over = 3 + pl["cooldown_s"] + 4
     t = 0.0
-    for s in range(1, lock["sessions"] + 1):
-        for b, v in lock["config"]["experiment"]["blocks"].items():
-            n = 4 * v["runs_per_cell"] - (done_runs(ctx, b, s) if remaining_only else 0)
-            mode = cfg["experiment"]["blocks"][b]["mode"]
-            per = (st["warmup_frames"] + st["closed_frames"]) * lat if mode == "closed" else \
-                st["open_seconds"] + st["warmup_frames"] * lat
-            t += max(n, 0) * (per + over)
+    for b in lock["blocks"]:
+        n = 4 * lock["runs_per_instance"] - done_runs(ctx, b, k)
+        mode = cfg["experiment"]["blocks"][b]["mode"]
+        per = (st["warmup_frames"] + st["closed_frames"]) * lat if mode == "closed" else \
+            st["open_seconds"] + st["warmup_frames"] * lat
+        t += max(n, 0) * (per + 3 + pl["cooldown_s"] + 4)
     return t / 3600.0
 
 
 def step_main(ctx):
-    banner("7/8  Main blocks, %d independent sessions" % ctx.a.sessions)
+    banner("7/8  Main blocks, instance %d (every condition %d time(s))" % (ctx.inst, ctx.a.runs))
     cfg, lock = ctx.cfg(), read_lock(ctx)
     mf = model_file(cfg, "%s_%s" % (cfg["model"]["name"], cfg["model"]["imgsz"]))
-    eta = eta_hours(ctx, cfg, lock)
-    say("estimated time left: %.1f h (rerun the same command to resume after any stop)" % eta)
+    eta = eta_hours(ctx, cfg, lock, ctx.inst)
+    say("estimated time for this instance: %.1f h (rerun the same command to resume after any stop)" % eta)
     if eta > ctx.a.max_hours and not ctx.a.force:
-        die("the plan needs %.0f h (> --max-hours %.0f). Usually the platform is unstable (heat, power: see "
-            "derived/g3.json and `vcgencmd get_throttled`) or runs are too long. Fix that, or use --sessions 1 / "
-            "--max-hours N." % (eta, ctx.a.max_hours))
-    blocks = lock["blocks"]
-    for s in range(1, lock["sessions"] + 1):
-        runs_sess = dict((b, lock["config"]["experiment"]["blocks"][b]["runs_per_cell"]) for b in blocks)
-        if all(done_runs(ctx, b, s) >= 4 * runs_sess[b] for b in blocks):
-            say("session %d already complete" % s)
-            continue
-        say("---- session %d/%d  (%s)" % (s, lock["sessions"], ", ".join("%s %d/cell" % (b, runs_sess[b]) for b in blocks)))
-        if s > 1 and PLATFORM.get(ctx.dev) and not ctx.a.skip_platform:
-            run(["bash", PLATFORM[ctx.dev]], check=False)   # re-assert clocks between sessions
-        for b in blocks:
-            ctx.py_run("src/run_experiment.py", "block", b, "--session", str(s), "--runs", str(runs_sess[b]), "--model", mf)
-        say("session %d complete - updating the analysis" % s)
-        analyse(ctx)
-        if ctx.a.push_each:
-            push(ctx, "session %d" % s)
+        die("instance needs %.0f h (> --max-hours %.0f): the platform is probably unstable (heat, power: "
+            "`vcgencmd get_throttled`) or runs are too long." % (eta, ctx.a.max_hours))
+    for b in lock["blocks"]:
+        ctx.py_run("src/run_experiment.py", "block", b, "--session", str(ctx.inst),
+                   "--runs", str(lock["runs_per_instance"]), "--model", mf)
+    with open(os.path.join(ctx.inst_dir, "COMPLETE"), "w") as f:
+        f.write(datetime.datetime.now().isoformat(timespec="seconds") + "\n")
+    say("instance %d complete - updating the analysis over all instances" % ctx.inst)
 
 
 def analyse(ctx, quiet=True):
-    rc, _ = ctx.py_run("analysis/summarize.py", check=False, quiet=quiet)
+    env = ctx.env_device
+    rc, _ = ctx.py_run("analysis/summarize.py", check=False, quiet=quiet, env=env)
     if rc == 0:
-        rc, tail = ctx.py_run("analysis/analyze.py", check=False, quiet=quiet)
+        rc, tail = ctx.py_run("analysis/analyze.py", check=False, quiet=quiet, env=env)
         for line in tail:
-            if line.strip().startswith(("mem_", "cpu", "RQ", "sessions")):
+            if line.strip().startswith(("mem_", "cpu", "RQ", "instances")):
                 say("  " + line.strip())
     if rc != 0:
         say("analysis step failed on this device (missing package?). The data is safe: run "
@@ -467,7 +472,7 @@ def analyse(ctx, quiet=True):
 
 
 def report(ctx):
-    ctx.py_run("analysis/report.py", check=False, quiet=True)
+    ctx.py_run("analysis/report.py", check=False, quiet=True, env=ctx.env_device)
 
 
 def push(ctx, what):
@@ -485,17 +490,19 @@ def push(ctx, what):
 def status(ctx):
     banner("Status: %s" % ctx.dev)
     lock = read_lock(ctx)
-    if not lock:
-        say("nothing locked yet: the run has not reached step 5")
+    if not lock.get("config", {}).get("model"):
+        say("nothing locked yet: instance 1 has not reached step 5")
         return
     c = lock["config"]
     say("model %s @ %s, %s FPS; frozen: %s" % (c["model"]["name"], c["model"]["imgsz"], c["deadline"]["fps"],
-                                              lock.get("frozen_at", "no (gates not finished)")))
-    if lock.get("frozen_at"):
-        for s in range(1, lock["sessions"] + 1):
-            say("session %d: %s" % (s, ", ".join("%s %d/%d" % (b, done_runs(ctx, b, s), 4 * v["runs_per_cell"])
-                                               for b, v in sorted(c["experiment"]["blocks"].items()))))
-        say("estimated time left: %.1f h" % eta_hours(ctx, ctx.cfg(), lock))
+                                              lock.get("frozen_at", "no (gates of instance 1 not finished)")))
+    for k in instances(ctx):
+        g = jload(os.path.join(ctx.res, "instance%d" % k, "gates.json"), {})
+        prog = ", ".join("%s %d/%d" % (b, done_runs(ctx, b, k), 4 * lock.get("runs_per_instance", 1))
+                         for b in lock.get("blocks", []))
+        say("instance %d: %s | gates %s | %s" % (k, "COMPLETE" if instance_complete(ctx, k) else "in progress",
+            ("G1 %s x%.1f" % ("PASS" if g.get("G1_pass") else "FAIL", g.get("candidate_ratio") or 0)) if g else "not yet",
+            prog))
     rep = os.path.join(ctx.res, "REPORT.md")
     if os.path.exists(rep):
         say("report: %s" % os.path.relpath(rep, ROOT))
@@ -507,29 +514,41 @@ def device_mode(dev, a):
         with open(os.path.join(ROOT, ".device"), "w") as f:
             f.write(dev + "\n")
     ctx = Ctx(dev, a)
-    os.makedirs(os.path.join(ctx.res, "logs"), exist_ok=True)
     if a.status:
         return status(ctx)
-    LOG[0] = open(os.path.join(ctx.res, "logs", "runscript_%s.log" % time.strftime("%Y%m%d_%H%M%S")), "w")
+    have = instances(ctx)
+    todo = [k for k in have if not instance_complete(ctx, k)]
+    start = a.instance or (todo[0] if todo else (max(have) + 1 if have else 1))
     t0 = time.time()
-    say("CONTEND runscript: device=%s  sessions=%d  blocks=%s  git=%s" % (
-        dev, a.sessions, " ".join(a.blocks), git("rev-parse", "--short", "HEAD") or "-"))
-    step_environment(ctx)
-    step_platform(ctx)
-    step_images(ctx)
-    step_models(ctx)
-    step_select(ctx)
-    step_models(ctx)          # Jetson: make sure the engine of the locked model exists
-    step_gates(ctx)
-    step_main(ctx)
-    banner("8/8  Final analysis")
-    analyse(ctx, quiet=False)
-    say("done (this invocation: %.0f min). Report: results/%s/REPORT.md" % ((time.time() - t0) / 60.0, dev))
-    if a.push or a.push_each:
-        push(ctx, "complete")
-    else:
-        say("Next: git add results/%s && git commit -m 'results: %s' && git pull --rebase && git push" % (dev, dev))
-        say("      (or re-run with --push). Then on the Mac: python3 runscript.py --compile")
+    for n, k in enumerate(range(start, start + a.instances)):
+        ctx.set_instance(k)
+        if LOG[0]:
+            LOG[0].close()
+        LOG[0] = open(os.path.join(ctx.inst_dir, "logs", "runscript_%s.log" % time.strftime("%Y%m%d_%H%M%S")), "w")
+        say("CONTEND runscript: device=%s  INSTANCE %d  blocks=%s  git=%s" % (
+            dev, k, " ".join(a.blocks), git("rev-parse", "--short", "HEAD") or "-"))
+        if instance_complete(ctx, k):
+            say("instance %d is already complete" % k)
+            continue
+        if n == 0:
+            step_environment(ctx)
+            step_images(ctx)
+            step_models(ctx)
+        step_platform(ctx)
+        step_select(ctx)
+        step_models(ctx)          # Jetson: make sure the engine of the locked model exists
+        step_gates(ctx)
+        step_main(ctx)
+        banner("8/8  Analysis over all instances")
+        analyse(ctx, quiet=False)
+        if a.push_each:
+            push(ctx, "instance %d" % k)
+    say("done (this command: %.0f min). Report: results/%s/REPORT.md   Next instance: run the same command again"
+        % ((time.time() - t0) / 60.0, dev))
+    if a.push and not a.push_each:
+        push(ctx, "instance %d" % k)
+    elif not a.push_each:
+        say("Push: git add results/%s && git commit -m 'results: %s' && git pull --rebase && git push" % (dev, dev))
 
 
 def prepare_mode(a):
@@ -572,7 +591,9 @@ def compile_mode(a):
     banner("Compile all devices")
     if not a.no_pull and git("remote"):
         run(["git", "pull", "--rebase"], check=False)
-    devs = sorted(os.path.basename(os.path.dirname(d)) for d in glob.glob(os.path.join(ROOT, "results", "*", "raw")))
+    devs = sorted(set(os.path.basename(os.path.dirname(d)) for d in glob.glob(os.path.join(ROOT, "results", "*", "raw")))
+                  | set(os.path.basename(os.path.dirname(os.path.dirname(d)))
+                        for d in glob.glob(os.path.join(ROOT, "results", "*", "instance*", "raw"))))
     devs = [d for d in devs if not d.startswith("smoke") or a.include_smoke]
     if not devs:
         die("no results/<device>/raw folders yet")
@@ -597,12 +618,14 @@ def main():
     g.add_argument("--prepare", action="store_true", help="host: ONNX models + perturbations to commit")
     g.add_argument("--compile", action="store_true", help="host: pull, analyse all devices, combine")
     g.add_argument("--profile", default=None, help="advanced: any configs/devices/<name>.yaml (e.g. smoke_rs)")
-    ap.add_argument("--sessions", type=int, default=3, help="independent repetitions of every block (default 3)")
+    ap.add_argument("--instances", type=int, default=1, help="complete instances to run back to back (default 1)")
+    ap.add_argument("--instance", type=int, default=None, help="run/resume this instance number (default: next)")
+    ap.add_argument("--runs", type=int, default=1, help="runs per condition in each instance (default 1)")
     ap.add_argument("--blocks", nargs="+", default=["E1", "E2", "E3"], help="blocks to run (E4 optional)")
     ap.add_argument("--status", action="store_true", help="show progress and time left, run nothing")
     ap.add_argument("--max-hours", type=float, default=30, help="stop before the main blocks if they would take longer")
     ap.add_argument("--push", action="store_true", help="commit + push results/<device> at the end")
-    ap.add_argument("--push-each", action="store_true", help="also commit + push after every session")
+    ap.add_argument("--push-each", action="store_true", help="commit + push after every instance")
     ap.add_argument("--force", action="store_true", help="continue even if a gate fails")
     ap.add_argument("--skip-platform", action="store_true", help="no sudo clock settings (test runs only)")
     ap.add_argument("--no-setup", action="store_true", help="never run the setup script")
@@ -611,8 +634,8 @@ def main():
     ap.add_argument("--models", nargs="+", default=["yolov8n"], help="--prepare: models")
     ap.add_argument("--sizes", nargs="+", type=int, default=[320, 416, 640], help="--prepare: input sizes")
     a = ap.parse_args()
-    if a.sessions < 1:
-        die("--sessions must be >= 1")
+    if a.instances < 1 or a.runs < 1:
+        die("--instances and --runs must be >= 1")
     os.chdir(ROOT)
     if a.smoke:
         sys.exit(subprocess.call(["bash", "scripts/smoke_test.sh"], cwd=ROOT))
