@@ -27,3 +27,4 @@ perturbations_smoke/
 results/smoke/
 results/smoke_rs/
 setup_*.log
+torchvision_build.log

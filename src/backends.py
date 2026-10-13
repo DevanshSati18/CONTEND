@@ -52,13 +52,17 @@ class _Base(object):
         pred = self.forward()
         self._sync()
         t2 = now()
+        if pred.device.type != self.nms_device.split(":")[0]:   # e.g. GPU inference, CPU NMS:
+            pred = pred.to(self.nms_device)                     # the copy is timed as d2h, not NMS
+            self._sync()
+        t2b = now()
         det, info = self._nms(pred)
         self._sync()
         t3 = now()
         det_host = det.cpu().numpy()
         t4 = now()
         info.update(t_pre_ms=(t1 - t0) * 1e3, t_inf_ms=(t2 - t1) * 1e3,
-                    t_nms_ms=(t3 - t2) * 1e3, t_d2h_ms=(t4 - t3) * 1e3)
+                    t_nms_ms=(t3 - t2b) * 1e3, t_d2h_ms=((t2b - t2) + (t4 - t3)) * 1e3)
         return info, det_host
 
 

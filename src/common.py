@@ -68,7 +68,28 @@ def load_config(path=None):
     cfg["device_id"] = dev
     for k in ("raw", "derived", "figures"):
         cfg["paths"][k] = cfg["paths"][k].replace("{device}", dev)
+    # an INSTANCE is one complete pass of the pipeline (gates + every condition once); its raw data
+    # and gate results live in results/<device>/instance<k>/. Without CONTEND_INSTANCE the paths
+    # point at the device level, where the analysis pools all instances.
+    inst = os.environ.get("CONTEND_INSTANCE")
+    cfg["instance"] = int(inst) if inst else None
+    if inst:
+        base = os.path.join("results", dev, "instance%d" % int(inst))
+        cfg["paths"]["raw"] = os.path.join(base, "raw")
+        cfg["paths"]["derived"] = os.path.join(base, "derived")
     return cfg
+
+
+def raw_dirs(cfg):
+    """Every raw folder of this device: the instance folders (plus a legacy device-level raw/)."""
+    import glob
+    dev = os.path.join(ROOT, "results", cfg["device_id"])
+    if cfg.get("instance"):
+        return [p(cfg["paths"]["raw"])]
+    out = sorted(glob.glob(os.path.join(dev, "instance*", "raw")),
+                 key=lambda d: int(os.path.basename(os.path.dirname(d))[8:] or 0))
+    legacy = p(cfg["paths"]["raw"])
+    return ([legacy] if os.path.isdir(legacy) else []) + out
 
 
 def p(rel):
@@ -120,6 +141,18 @@ def frame_cache(cfg, imgsz, ids=None, rebuild=False):
     return frames
 
 
+def adv_frames(frames, delta):
+    """Apply the universal perturbation ONCE, ahead of time, and quantise to uint8 - as a camera
+    would deliver the perturbed scene. Clean and adversarial frames then go through identical
+    per-frame pre-processing, so the attack cannot add CPU work of its own (measured on the
+    Jetson: adding delta per frame cost +2.7 ms of pre-processing, an artifact)."""
+    d = np.ascontiguousarray(delta.transpose(1, 2, 0) * 255.0, dtype=np.float32)
+    out = np.empty(frames.shape, dtype=np.uint8)
+    for i in range(len(frames)):
+        out[i] = np.clip(np.rint(frames[i].astype(np.float32) + d), 0, 255).astype(np.uint8)
+    return out
+
+
 def to_input(frame_u8, delta=None):
     """uint8 HWC frame -> float32 NCHW in [0,1], optionally + perturbation (CHW, same size)."""
     x = frame_u8.astype(np.float32).transpose(2, 0, 1)[None] / 255.0
@@ -136,6 +169,15 @@ def soc_temp_c():
         return best
     for z in os.listdir(base):
         f = os.path.join(base, z, "temp")
+        try:
+            with open(os.path.join(base, z, "type")) as fh:
+                kind = fh.read().strip().lower()
+            # Jetson Nano: PMIC-Die reports a fixed 100 C and thermal-fan-est a fixed/estimated
+            # value - neither is a die temperature (the Nano logged a constant 50.0 C)
+            if "pmic" in kind or "fan" in kind or "est" in kind:
+                continue
+        except Exception:
+            pass
         try:
             with open(f) as fh:
                 t = int(fh.read().strip()) / 1000.0
@@ -183,7 +225,8 @@ def env_info():
     for path in ["/etc/nv_tegra_release", "/proc/device-tree/model"]:
         try:
             with open(path) as f:
-                info[os.path.basename(path)] = f.read().strip().replace("\x00", "")
+                key = "board" if path.endswith("model") else os.path.basename(path)   # not "model": clashes with the detector name
+                info[key] = f.read().strip().replace("\x00", "")
         except Exception:
             pass
     try:

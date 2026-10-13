@@ -1,7 +1,0 @@
-device_id,device_label,platform_class,deadline_ms,block,contention,cell,runs,sessions,miss_rate,drop_rate,max_consec_miss,tard_p95_ms,lat_p99,miss_rate_ci95
-smoke,Smoke test (tiny settings; code check only),smoke,33.333333333333336,E3,mem_high,A,2.0,1.0,0.0,0.0,0.0,0.0,17.165916179292253,
-smoke,Smoke test (tiny settings; code check only),smoke,33.333333333333336,E3,mem_high,B,2.0,1.0,0.0,0.0,0.0,0.0,16.4426115367678,
-smoke,Smoke test (tiny settings; code check only),smoke,33.333333333333336,E3,mem_high,C,2.0,1.0,0.0,0.0,0.0,0.0,12.985418183598085,
-smoke,Smoke test (tiny settings; code check only),smoke,33.333333333333336,E3,mem_high,D,2.0,1.0,0.0,0.0,0.0,0.0,13.77762730058748,
-smoke,Smoke test (tiny settings; code check only),smoke,33.333333333333336,E3,mem_high,attack_effect_no_load(B-A),,,0.0,,,,,0.0000;0.0000
-smoke,Smoke test (tiny settings; code check only),smoke,33.333333333333336,E3,mem_high,attack_effect_under_load(D-C),,,0.0,,,,,0.0000;0.0000

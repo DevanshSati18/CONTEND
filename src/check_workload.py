@@ -15,7 +15,7 @@ import os
 import numpy as np
 
 from backends import make_backend
-from common import frame_cache, load_config, p
+from common import adv_frames, frame_cache, load_config, p
 
 
 def boot_ci(diff, n=5000, seed=0):
@@ -38,12 +38,13 @@ def main():
     name = cfg["model"]["name"]
     delta = np.load(a.delta or os.path.join(p(cfg["paths"]["perturbations"]), "%s_%d.npy" % (name, a.imgsz))).astype(np.float32)
     be = make_backend(a.backend, a.model, dict(cfg["nms"]))
+    frames_adv = adv_frames(frames, delta)                   # same pre-processing for both inputs
     for fr in frames[:20]:                                   # warm-up
         be.process(fr, None)
     res = {"clean": [], "adv": []}
-    for fr in frames:                                        # paired: same frame, both inputs
-        for key, d in (("clean", None), ("adv", delta)):
-            info, _ = be.process(fr, d)
+    for fr, fa in zip(frames, frames_adv):                   # paired: same frame, both inputs
+        for key, x in (("clean", fr), ("adv", fa)):
+            info, _ = be.process(x, None)
             res[key].append(info)
     out = {}
     for key in res:

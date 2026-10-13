@@ -153,11 +153,14 @@ setup_nvidia() {
   ok "swap: $(free -m | awk '/Swap/{print $2}') MB"
   sudo apt-get update -q
   sudo apt-get install -y -q python3-pip python3-dev python3-yaml python3-pandas python3-scipy \
-       libopenblas-base libopenmpi-dev libjpeg-dev zlib1g-dev gcc git tmux
+       libopenblas-base libopenmpi-dev libomp-dev libjpeg-dev zlib1g-dev gcc git tmux
   say "python -> python3.6"
   sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.6 1 >/dev/null
   ok "$(python --version 2>&1)"
   PY=$(command -v python3)
+  say "pip (Ubuntu 18.04 ships pip 9, too old for aarch64 manylinux2014 wheels)"
+  $PY -m pip install --user -q --upgrade "pip<22" "setuptools<60" wheel
+  ok "$($PY -m pip --version)"
   say "PyTorch 1.10.0 (NVIDIA wheel)"
   if ! $PY -c "import torch" 2>/dev/null; then
     WHL=$(ls "$HOME"/wheels/torch-1.10.0-cp36-cp36m-linux_aarch64.whl 2>/dev/null || true)
@@ -169,8 +172,10 @@ setup_nvidia() {
   ok "torch $($PY -c 'import torch;print(torch.__version__)') with CUDA"
   say "torchvision 0.11.1 from source (~45-60 min, once)"
   if ! $PY -c "import torchvision" 2>/dev/null; then
+    $PY -m pip install --user -q "pillow<9"      # newest Pillow for Python 3.6; the build would fetch an incompatible one
     [ -d "$HOME/torchvision" ] || git clone -q --depth 1 --branch v0.11.1 https://github.com/pytorch/vision "$HOME/torchvision"
-    (cd "$HOME/torchvision" && BUILD_VERSION=0.11.1 MAX_JOBS=2 $PY setup.py install --user >/dev/null)
+    (cd "$HOME/torchvision" && BUILD_VERSION=0.11.1 MAX_JOBS=2 $PY setup.py install --user > "$ROOT/torchvision_build.log" 2>&1) \
+      || die "torchvision build failed: see the last lines of torchvision_build.log"
   fi
   $PY -c "import torch, torchvision; b=torch.rand(50,4).cuda()*100; b[:,2:]+=b[:,:2]; torchvision.ops.nms(b, torch.rand(50).cuda(), .5)" \
     || die "torchvision CUDA NMS failed"

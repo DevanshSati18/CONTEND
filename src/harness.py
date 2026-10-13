@@ -17,7 +17,7 @@ import time
 
 import numpy as np
 
-from common import frame_cache, load_config, p, pin_to_cores, soc_temp_c
+from common import adv_frames, frame_cache, load_config, p, pin_to_cores, soc_temp_c
 
 now = time.perf_counter
 
@@ -118,6 +118,7 @@ def main():
     delta = None
     if a.input == "adv":
         delta = load_delta(a.delta or os.path.join(p(cfg["paths"]["perturbations"]), "%s_%d.npy" % (cfg["model"]["name"], imgsz)))
+        frames, delta = adv_frames(frames, delta), None     # perturbation baked into the pixels
     nms_cfg = dict(cfg["nms"])
     a.backend = a.backend or cfg["runtime"]["backend"]
     be = __import__("backends").make_backend(a.backend, a.model, nms_cfg)
