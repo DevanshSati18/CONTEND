@@ -374,8 +374,12 @@ def step_gates(ctx):
     if not g1.get("G1_pass"):
         fails.append("G1 (attack does not inflate the NMS workload enough on this device: candidates x%.1f)"
                      % g1.get("candidate_ratio", 0))
+    used = set(cfg["experiment"]["blocks"][b]["contention"] for b in ctx.a.blocks)
     for k, v in (g2 or {}).items():
-        if v.get("G2_pass") is False:
+        if v.get("G2_pass") is False and k not in used:
+            say("note: G2 %s %+.1f %% (< 10 %%) - not used by blocks %s, reported only" % (
+                k, 100 * v["slowdown"], " ".join(ctx.a.blocks)))
+        elif v.get("G2_pass") is False:
             fails.append("G2 %s (co-runner slows clean latency only %+.1f %%, needs >= 10 %%)" % (k, 100 * v["slowdown"]))
     say("G1 %s | G2 %s | G3 %d runs per cell needed" % (
         "PASS" if g1.get("G1_pass") else "FAIL",
