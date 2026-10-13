@@ -1,7 +1,7 @@
 # CONTEND results: jetson_nano
 
 _NVIDIA Jetson Nano 4GB (Maxwell GPU, 4x Cortex-A57, shared LPDDR4)_  
-Generated 2026-10-12 19:09 by `analysis/report.py` (re-run after every session; numbers come from `derived/results.json`).
+Generated 2026-10-13 19:40 by `analysis/report.py` (re-run after every instance; numbers come from `derived/results.json`).
 
 ## Configuration (locked on this device)
 
@@ -9,24 +9,19 @@ Generated 2026-10-12 19:09 by `analysis/report.py` (re-run after every session; 
 |---|---|
 | Backend / precision | trt / fp16 |
 | Model / input size | yolov8n / 416 |
-| Deadline | 15 FPS (66.7 ms); clean latency 36.58 ms = 55 % of the deadline |
+| Deadline | 15 FPS (66.7 ms); clean latency 37.56 ms = 56 % of the deadline |
 | 50-70 % rule met | True |
-| Sessions planned | n/a |
-| Runs per cell per session |  |
-| Frozen (pre-registration) | not yet (git ?) |
+| Runs per condition per instance | 1 |
+| Frozen (pre-registration) | 2026-10-13T18:41:31 (git 9187815) |
 
-## Gates
+## Instances (each = gates + every condition once)
 
-| Gate | Result |
-|---|---|
-| G1 workload | FAIL: candidates x32.3, NMS +-4.69 ms (95% CI -15.13 to 1.10) |
-| G2 cpu | CONTROL: clean 37.56 -> loaded 36.88 ms (-1.8 %) |
-| G2 mem_high | PASS: clean 37.53 -> loaded 51.21 ms (+36.5 %) |
-| G2 mem_low | PASS: clean 38.03 -> loaded 45.42 ms (+19.4 %) |
-| G3 pilot | worst between-run CV 0.94 % -> 6 runs per cell needed |
+| Instance | Status | G1 candidates | G1 NMS increase (95% CI) | G2 memory high / low | CPU control | G3 worst CV |
+|---|---|---|---|---|---|---|
+| instance5 | complete | x32.3 PASS | +4.08 ms [+3.47, +4.87] | +27.7 % / +10.3 % | +0.4 % | 2.24 % |
 
 ## Files
 
-- `raw/<block>/<run_id>.csv.gz` per-frame logs; `raw/runs.csv` run manifest
+- `instance<k>/raw/<block>/<run_id>.csv.gz` per-frame logs; `instance<k>/derived/` that instance's gates
 - `derived/run_summary.csv` one row per run; `derived/results.json` all statistics
 - `figures/fig2..fig4` (PDF + PNG)
