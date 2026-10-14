@@ -1,0 +1,159 @@
+[17:12:33] CONTEND runscript: device=jetson_nano  INSTANCE 2  blocks=E1 E2 E3  git=4da09e7
+
+[17:12:33] ==============================================================================
+[17:12:33] 1/8  Environment for jetson_nano
+[17:12:33] ==============================================================================
+[17:12:44] python: /usr/bin/python3 - all packages present
+[17:12:44] $ gcc -O2 -o /home/sitacs/Desktop/CONTEND/corunners/bwhog /home/sitacs/Desktop/CONTEND/corunners/bwhog.c
+[17:12:44] $ gcc -O2 -o /home/sitacs/Desktop/CONTEND/corunners/cpuhog /home/sitacs/Desktop/CONTEND/corunners/cpuhog.c
+[17:12:44] co-runners compiled
+
+[17:12:44] ==============================================================================
+[17:12:44] 3/8  Evaluation images (seeded subset)
+[17:12:44] ==============================================================================
+[17:12:45] 500 images present (0 downloaded now)
+
+[17:12:45] ==============================================================================
+[17:12:45] 4/8  Models and perturbations
+[17:12:45] ==============================================================================
+[17:12:46] candidates (ONNX + perturbation): yolov8n_320, yolov8n_416
+[17:12:46] models ready
+
+[17:12:46] ==============================================================================
+[17:12:46] 2/8  Platform control (fixed clocks / governor)
+[17:12:46] ==============================================================================
+[17:12:46] $ bash scripts/11_nano_session.sh
+    NVPM WARN: fan mode is not set!
+    NV Power Mode: MAXN
+    0
+    SOC family:tegra210  Machine:NVIDIA Jetson Nano Developer Kit
+    Online CPUs: 0-3
+    cpu0: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu1: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu2: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu3: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    GPU MinFreq=921600000 MaxFreq=921600000 CurrentFreq=921600000
+    EMC MinFreq=204000000 MaxFreq=1600000000 CurrentFreq=1600000000 FreqOverride=1
+    Fan: PWM=255
+    NV Power Mode: MAXN
+    Idle 5 minutes before the first run. Write the room temperature into docs/session_log.md.
+
+[17:12:58] ==============================================================================
+[17:12:58] 5/8  Configuration choice (clean latency at 50-70 % of the frame deadline)
+[17:12:58] ==============================================================================
+[17:12:58] already locked: yolov8n @ 416, 15 FPS (delete results/jetson_nano/locked_config.yaml to choose again)
+
+[17:12:58] ==============================================================================
+[17:12:58] 4/8  Models and perturbations
+[17:12:58] ==============================================================================
+[17:12:59] candidates (ONNX + perturbation): yolov8n_320, yolov8n_416
+[17:12:59] models ready
+
+[17:12:59] ==============================================================================
+[17:12:59] 6/8  Gates G1 (workload), G2 (contention), G3 (pilot)
+[17:12:59] ==============================================================================
+[17:13:00] $ /usr/bin/python3 src/check_workload.py --backend trt --model models/yolov8n_416.engine --imgsz 416 --delta perturbations/yolov8n_416.npy --n 200 --out /home/sitacs/Desktop/CONTEND/results/jetson_nano/instance2/derived/g1_device.json
+    {
+      "clean": {
+        "n_pre_nms": 30.55,
+        "n_post_nms": 4.65,
+        "t_inf_ms": 26.275802780000678,
+        "t_nms_ms": 4.551306949996956,
+        "t_pre_ms": 8.169950749996815,
+        "t_d2h_ms": 1.0303645550030183
+      },
+      "adv": {
+        "n_pre_nms": 1290.16,
+        "n_post_nms": 260.355,
+        "t_inf_ms": 26.36253925499659,
+        "t_nms_ms": 10.441582239998013,
+        "t_pre_ms": 6.99506476000181,
+        "t_d2h_ms": 1.0304779950030252
+      },
+      "candidate_ratio": 42.231096563011455,
+      "nms_increase_ms_mean": 5.890275290001057,
+      "nms_increase_ms_ci95": [
+        4.771469422002433,
+        6.736381148872687
+      ],
+      "G1_pass": true
+    }
+    G1 PASS: candidates x42.2, NMS +5.89 ms (95% CI 4.77 to 6.74)
+[17:14:22] $ /usr/bin/python3 src/run_experiment.py g2 --model models/yolov8n_416.engine
+    G2_A_mem_low_r00              500 frames  temp 37.0 C  co-runner []
+    G2_C_mem_low_r00              500 frames  temp 34.0 C  co-runner [5.114069767441861]
+    G2 mem_low  clean 39.02 ms -> loaded 45.32 ms  (+16.1%)  PASS
+    G2_A_mem_high_r00             500 frames  temp 35.0 C  co-runner []
+    G2_C_mem_high_r00             500 frames  temp 34.5 C  co-runner [3.5385000000000004, 3.7427234042553197]
+    G2 mem_high clean 38.55 ms -> loaded 48.12 ms  (+24.8%)  PASS
+    G2_A_cpu_r00                  500 frames  temp 35.0 C  co-runner []
+    G2_C_cpu_r00                  500 frames  temp 35.0 C  co-runner [56.996969696969714, 60.34848484848485]
+    G2 cpu      clean 38.69 ms -> loaded 38.66 ms  (-0.1%)  CONTROL (reported, no threshold)
+[17:25:28] $ /usr/bin/python3 src/run_experiment.py pilot --runs 2 --model models/yolov8n_416.engine
+    PILOT_A_mem_high_r00         1000 frames  temp 35.0 C  co-runner []
+    PILOT_A_mem_high_r01         1000 frames  temp 34.5 C  co-runner []
+    PILOT_B_mem_high_r00         1000 frames  temp 34.5 C  co-runner []
+    PILOT_B_mem_high_r01         1000 frames  temp 34.5 C  co-runner []
+    PILOT_C_mem_high_r00         1000 frames  temp 35.0 C  co-runner [3.7965921052631573, 3.5911044776119394]
+    PILOT_C_mem_high_r01         1000 frames  temp 36.0 C  co-runner [3.5707540983606556, 3.4807580645161282]
+    PILOT_D_mem_high_r00         1000 frames  temp 36.5 C  co-runner [3.659342465753424, 3.7014383561643833]
+    PILOT_D_mem_high_r01         1000 frames  temp 37.0 C  co-runner [3.6713013698630146, 3.691904109589042]
+    cell A  mean 39.18 ms  between-run CV 0.52%
+    cell B  mean 45.93 ms  between-run CV 3.06%
+    cell C  mean 48.03 ms  between-run CV 1.35%
+    cell D  mean 55.63 ms  between-run CV 0.24%
+    G3: worst CV 3.06% -> about 17 runs per cell needed (minimum 6)
+[17:43:44] G1 PASS | G2 cpu control, mem_high PASS, mem_low PASS | G3 17 runs per cell needed
+[17:43:44] instance 2: gates recorded; every condition of E1 E2 E3 measured 1 time(s)
+
+[17:43:44] ==============================================================================
+[17:43:44] 7/8  Main blocks, instance 2 (every condition 1 time(s))
+[17:43:44] ==============================================================================
+[17:43:46] estimated time for this instance: 0.9 h (rerun the same command to resume after any stop)
+[17:43:46] $ /usr/bin/python3 src/run_experiment.py block E1 --session 2 --runs 1 --model models/yolov8n_416.engine
+    E1_A_mem_high_s2_r00         3000 frames  temp 36.5 C  co-runner []
+    E1_B_mem_high_s2_r00         3000 frames  temp 38.0 C  co-runner []
+    E1_C_mem_high_s2_r00         3000 frames  temp 38.5 C  co-runner [3.6454885057471254, 3.610742514970059]
+    E1_D_mem_high_s2_r00         3000 frames  temp 40.5 C  co-runner [3.569254054054051, 3.6970163043478266]
+[18:00:12] $ /usr/bin/python3 src/run_experiment.py block E2 --session 2 --runs 1 --model models/yolov8n_416.engine
+    E2_B_cpu_s2_r00              3000 frames  temp 39.5 C  co-runner []
+    E2_C_cpu_s2_r00              3000 frames  temp 40.0 C  co-runner [58.00458015267174, 56.66030534351145]
+    E2_A_cpu_s2_r00              3000 frames  temp 40.5 C  co-runner []
+    E2_D_cpu_s2_r00              3000 frames  temp 40.5 C  co-runner [56.45436241610739, 58.62281879194633]
+[18:14:54] $ /usr/bin/python3 src/run_experiment.py block E3 --session 2 --runs 1 --model models/yolov8n_416.engine
+    E3_D_mem_high_s2_r00         4500 frames  temp 41.0 C  co-runner [3.8304956268221537, 3.877264094955492]
+    E3_A_mem_high_s2_r00         4500 frames  temp 41.0 C  co-runner []
+    E3_C_mem_high_s2_r00         4500 frames  temp 37.0 C  co-runner [3.7582541254125403, 3.8782091503268004]
+    E3_B_mem_high_s2_r00         4500 frames  temp 37.5 C  co-runner []
+[18:41:38] instance 2 complete - updating the analysis over all instances
+
+[18:41:38] ==============================================================================
+[18:41:38] 8/8  Analysis over all instances
+[18:41:38] ==============================================================================
+[18:41:38] $ /usr/bin/python3 analysis/summarize.py
+    Traceback (most recent call last):
+      File "analysis/summarize.py", line 17, in <module>
+        from scipy import stats
+      File "/usr/lib/python3/dist-packages/scipy/stats/__init__.py", line 348, in <module>
+        from .stats import *
+      File "/usr/lib/python3/dist-packages/scipy/stats/stats.py", line 177, in <module>
+        from . import distributions
+      File "/usr/lib/python3/dist-packages/scipy/stats/distributions.py", line 13, in <module>
+        from . import _continuous_distns
+      File "/usr/lib/python3/dist-packages/scipy/stats/_continuous_distns.py", line 15, in <module>
+        from scipy._lib._numpy_compat import broadcast_to
+      File "/usr/lib/python3/dist-packages/scipy/_lib/_numpy_compat.py", line 10, in <module>
+        from numpy.testing.nosetester import import_nose
+    ModuleNotFoundError: No module named 'numpy.testing.nosetester'
+[18:41:42] analysis step failed on this device (missing package?). The data is safe: run `python3 runscript.py --compile` on the Mac after pulling.
+[18:41:42] $ /usr/bin/python3 analysis/report.py
+    Traceback (most recent call last):
+      File "analysis/report.py", line 173, in <module>
+        main()
+      File "analysis/report.py", line 169, in main
+        device_report(load_config())
+      File "analysis/report.py", line 124, in device_report
+        with open(out, "w") as f:
+    PermissionError: [Errno 13] Permission denied: '/home/sitacs/Desktop/CONTEND/results/jetson_nano/REPORT.md'
+[18:41:44] done (this command: 89 min). Report: results/jetson_nano/REPORT.md   Next instance: run the same command again
+[18:41:44] $ git add -A results/jetson_nano
