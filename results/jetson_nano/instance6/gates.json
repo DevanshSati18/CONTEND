@@ -1,0 +1,27 @@
+{
+  "instance": 6,
+  "G1_pass": true,
+  "candidate_ratio": 42.231096563011455,
+  "nms_increase_ms": 5.74989949486735,
+  "nms_increase_ci95": [
+    4.91944864456309,
+    6.475757890001659
+  ],
+  "G2": {
+    "mem_low": {
+      "slowdown": 0.09417141264198481,
+      "passed": false
+    },
+    "mem_high": {
+      "slowdown": 0.2354642912880487,
+      "passed": true
+    },
+    "cpu": {
+      "slowdown": -0.002732502380136781,
+      "passed": null
+    }
+  },
+  "G3_worst_cv": 0.05089418815779098,
+  "forced": false,
+  "time": "2026-10-15T03:28:20"
+}
