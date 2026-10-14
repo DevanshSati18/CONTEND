@@ -158,3 +158,101 @@
     PermissionError: [Errno 13] Permission denied: '/home/sitacs/Desktop/CONTEND/results/jetson_nano/REPORT.md'
 [01:06:58] done (this command: 88 min). Report: results/jetson_nano/REPORT.md   Next instance: run the same command again
 [01:06:58] $ git add -A results/jetson_nano
+[01:06:58] $ git commit -m results: jetson_nano instance 4 (2026-10-15 01:06)
+    [master adc68bb] results: jetson_nano instance 4 (2026-10-15 01:06)
+     89 files changed, 968 insertions(+)
+     create mode 100644 results/jetson_nano/instance4/COMPLETE
+     create mode 100644 results/jetson_nano/instance4/derived/g1_device.json
+     create mode 100644 results/jetson_nano/instance4/derived/g2.json
+     create mode 100644 results/jetson_nano/instance4/derived/g3.json
+     create mode 100644 results/jetson_nano/instance4/gates.json
+     create mode 100644 results/jetson_nano/instance4/logs/runscript_20261014_233828.log
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_A_mem_high_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_A_mem_high_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_B_mem_high_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_B_mem_high_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_C_mem_high_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_C_mem_high_s4_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_C_mem_high_s4_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_C_mem_high_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_D_mem_high_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_D_mem_high_s4_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_D_mem_high_s4_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E1/E1_D_mem_high_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_A_cpu_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_A_cpu_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_B_cpu_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_B_cpu_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_C_cpu_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_C_cpu_s4_r00_logs/cpu_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_C_cpu_s4_r00_logs/cpu_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_C_cpu_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_D_cpu_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_D_cpu_s4_r00_logs/cpu_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_D_cpu_s4_r00_logs/cpu_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E2/E2_D_cpu_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_A_mem_high_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_A_mem_high_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_B_mem_high_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_B_mem_high_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_C_mem_high_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_C_mem_high_s4_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_C_mem_high_s4_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_C_mem_high_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_D_mem_high_s4_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_D_mem_high_s4_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_D_mem_high_s4_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/E3/E3_D_mem_high_s4_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_A_cpu_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_A_cpu_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_A_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_A_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_A_mem_low_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_A_mem_low_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_cpu_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_cpu_r00_logs/cpu_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_cpu_r00_logs/cpu_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_cpu_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_mem_high_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_mem_high_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_mem_low_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_mem_low_r00_logs/mem_low_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/G2/G2_C_mem_low_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_A_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_A_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_A_mem_high_r01.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_A_mem_high_r01_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_B_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_B_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_B_mem_high_r01.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_B_mem_high_r01_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_C_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_C_mem_high_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_C_mem_high_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_C_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_C_mem_high_r01.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_C_mem_high_r01_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_C_mem_high_r01_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_C_mem_high_r01_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_D_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_D_mem_high_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_D_mem_high_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_D_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_D_mem_high_r01.csv.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_D_mem_high_r01_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_D_mem_high_r01_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/PILOT/PILOT_D_mem_high_r01_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance4/raw/env_20261014_234037.json
+     create mode 100644 results/jetson_nano/instance4/raw/env_20261014_235146.json
+     create mode 100644 results/jetson_nano/instance4/raw/env_20261015_000952.json
+     create mode 100644 results/jetson_nano/instance4/raw/env_20261015_002557.json
+     create mode 100644 results/jetson_nano/instance4/raw/env_20261015_004042.json
+     create mode 100644 results/jetson_nano/instance4/raw/runs.csv
+[01:06:58] $ git pull --rebase
+    error: cannot pull with rebase: You have unstaged changes.
+    error: please commit or stash them.
+[01:06:58] $ git push
+    fatal: unable to access 'https://github.com/DevanshSati18/CONTEND.git/': server certificate verification failed. CAfile: /etc/ssl/certs/ca-certificates.crt CRLfile: none
+[01:06:59] push failed (credentials?). Results are committed locally; run `git push` yourself.
