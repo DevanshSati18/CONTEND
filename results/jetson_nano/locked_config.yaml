@@ -1,0 +1,26 @@
+# Written by runscript.py on this device. 'config' overrides configs/contend.yaml +
+# configs/devices/jetson_nano.yaml. Frozen before the main runs = pre-registration record;
+# change only with a dated note in docs/CHANGELOG.md (or delete it to start over).
+device: "jetson_nano"
+selected_at: "2026-10-14T13:23:51"
+rule_met: true
+clean_ms: 37.66
+deadline_share: "56 %"
+config:
+  model:
+    name: "yolov8n"
+    imgsz: 416
+  deadline:
+    fps: 15
+  experiment:
+    blocks:
+      E1:
+        runs_per_cell: 1
+      E2:
+        runs_per_cell: 1
+      E3:
+        runs_per_cell: 1
+blocks: ["E1", "E2", "E3"]
+runs_per_instance: 1
+frozen_at: "2026-10-14T13:56:20"
+git_commit: "5d645d2"

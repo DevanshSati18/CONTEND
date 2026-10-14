@@ -1,0 +1,278 @@
+[13:02:21] CONTEND runscript: device=jetson_nano  INSTANCE 1  blocks=E1 E2 E3  git=5d645d2
+
+[13:02:21] ==============================================================================
+[13:02:21] 1/8  Environment for jetson_nano
+[13:02:21] ==============================================================================
+[13:02:26] python: /usr/bin/python3 - all packages present
+[13:02:26] $ gcc -O2 -o /home/sitacs/Desktop/CONTEND/corunners/bwhog /home/sitacs/Desktop/CONTEND/corunners/bwhog.c
+[13:02:26] $ gcc -O2 -o /home/sitacs/Desktop/CONTEND/corunners/cpuhog /home/sitacs/Desktop/CONTEND/corunners/cpuhog.c
+[13:02:27] co-runners compiled
+
+[13:02:27] ==============================================================================
+[13:02:27] 3/8  Evaluation images (seeded subset)
+[13:02:27] ==============================================================================
+[13:02:27] 500 images present (0 downloaded now)
+
+[13:02:27] ==============================================================================
+[13:02:27] 4/8  Models and perturbations
+[13:02:27] ==============================================================================
+[13:02:28] candidates (ONNX + perturbation): yolov8n_320, yolov8n_416
+[13:02:28] building TensorRT FP16 engines (~5-10 min each): models/yolov8n_320.onnx models/yolov8n_416.onnx
+[13:02:28] $ bash scripts/12_build_engines.sh models/yolov8n_320.onnx models/yolov8n_416.onnx
+    == building models/yolov8n_320.engine
+    [10/14/2026-13:11:10] [I] Total GPU Compute Time: 2.9517 s
+    [10/14/2026-13:11:10] [I] Explanations of the performance metrics are printed in the verbose logs.
+    [10/14/2026-13:11:10] [I] 
+    &&&& PASSED TensorRT.trtexec [TensorRT v8201] # /usr/src/tensorrt/bin/trtexec --onnx=models/yolov8n_320.onnx --saveEngine=models/yolov8n_320.engine --fp16 --workspace=1024
+    == building models/yolov8n_416.engine
+    [10/14/2026-13:20:02] [I] Total GPU Compute Time: 3.0247 s
+    [10/14/2026-13:20:02] [I] Explanations of the performance metrics are printed in the verbose logs.
+    [10/14/2026-13:20:02] [I] 
+    &&&& PASSED TensorRT.trtexec [TensorRT v8201] # /usr/src/tensorrt/bin/trtexec --onnx=models/yolov8n_416.onnx --saveEngine=models/yolov8n_416.engine --fp16 --workspace=1024
+    -rw-r--r-- 1 root root  9374212 Oct 14 13:11 models/yolov8n_320.engine
+    -rw-r--r-- 1 root root 14817123 Oct 14 13:19 models/yolov8n_416.engine
+[13:20:03] models ready
+
+[13:20:03] ==============================================================================
+[13:20:03] 2/8  Platform control (fixed clocks / governor)
+[13:20:03] ==============================================================================
+[13:20:03] $ bash scripts/11_nano_session.sh
+    NVPM WARN: fan mode is not set!
+    NV Power Mode: MAXN
+    0
+    SOC family:tegra210  Machine:NVIDIA Jetson Nano Developer Kit
+    Online CPUs: 0-3
+    cpu0: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu1: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu2: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    cpu3: Online=1 Governor=schedutil MinFreq=1479000 MaxFreq=1479000 CurrentFreq=1479000 IdleStates: WFI=0 c7=0 
+    GPU MinFreq=921600000 MaxFreq=921600000 CurrentFreq=921600000
+    EMC MinFreq=204000000 MaxFreq=1600000000 CurrentFreq=1600000000 FreqOverride=1
+    Fan: PWM=255
+    NV Power Mode: MAXN
+    Idle 5 minutes before the first run. Write the room temperature into docs/session_log.md.
+
+[13:20:04] ==============================================================================
+[13:20:04] 5/8  Configuration choice (clean latency at 50-70 % of the frame deadline)
+[13:20:04] ==============================================================================
+[13:20:05] $ /usr/bin/python3 src/choose_config.py --models models/yolov8n_320.engine models/yolov8n_416.engine
+    device: jetson_nano   backend: trt
+    model                      mean ms  %@30fps  %@15fps  %@10fps  %@5fps  %@2fps
+    yolov8n_320                  24.24       73%       36%       24%       12%        5%   
+    yolov8n_416                  37.66      113%       56%       38%       19%        8%   OK at 15 FPS
+    
+    RECOMMENDED for jetson_nano: model.name=yolov8n  model.imgsz=416  deadline.fps=15  (clean 37.7 ms)
+[13:23:51] LOCKED: yolov8n @ 416, 15 FPS (clean 37.7 ms = 56 % of the deadline)
+
+[13:23:51] ==============================================================================
+[13:23:51] 4/8  Models and perturbations
+[13:23:51] ==============================================================================
+[13:23:53] candidates (ONNX + perturbation): yolov8n_320, yolov8n_416
+[13:23:53] models ready
+
+[13:23:53] ==============================================================================
+[13:23:53] 6/8  Gates G1 (workload), G2 (contention), G3 (pilot)
+[13:23:53] ==============================================================================
+[13:23:54] $ /usr/bin/python3 src/check_workload.py --backend trt --model models/yolov8n_416.engine --imgsz 416 --delta perturbations/yolov8n_416.npy --n 200 --out /home/sitacs/Desktop/CONTEND/results/jetson_nano/instance1/derived/g1_device.json
+    {
+      "clean": {
+        "n_pre_nms": 30.55,
+        "n_post_nms": 4.65,
+        "t_inf_ms": 26.174723425015145,
+        "t_nms_ms": 4.053166035009781,
+        "t_pre_ms": 7.320780599989121,
+        "t_d2h_ms": 1.008273129978079
+      },
+      "adv": {
+        "n_pre_nms": 1290.16,
+        "n_post_nms": 260.355,
+        "t_inf_ms": 26.224413059983362,
+        "t_nms_ms": 10.310841965015243,
+        "t_pre_ms": 6.80691979998528,
+        "t_d2h_ms": 1.0102237500063893
+      },
+      "candidate_ratio": 42.231096563011455,
+      "nms_increase_ms_mean": 6.257675930005462,
+      "nms_increase_ms_ci95": [
+        5.586210294003195,
+        7.034779332988875
+      ],
+      "G1_pass": true
+    }
+    G1 PASS: candidates x42.2, NMS +6.26 ms (95% CI 5.59 to 7.03)
+[13:25:43] $ /usr/bin/python3 src/run_experiment.py g2 --model models/yolov8n_416.engine
+    G2_A_mem_low_r00              500 frames  temp 36.5 C  co-runner []
+    G2_C_mem_low_r00              500 frames  temp 36.5 C  co-runner [5.314630434782609]
+    G2 mem_low  clean 39.21 ms -> loaded 42.62 ms  (+8.7%)  FAIL
+    G2_A_mem_high_r00             500 frames  temp 36.5 C  co-runner []
+    G2_C_mem_high_r00             500 frames  temp 37.0 C  co-runner [3.641765625, 4.064384615384617]
+    G2 mem_high clean 38.34 ms -> loaded 46.89 ms  (+22.3%)  PASS
+    G2_A_cpu_r00                  500 frames  temp 37.0 C  co-runner []
+    G2_C_cpu_r00                  500 frames  temp 36.5 C  co-runner [59.10909090909092, 57.512121212121215]
+    G2 cpu      clean 37.92 ms -> loaded 37.98 ms  (+0.1%)  CONTROL (reported, no threshold)
+[13:37:46] $ /usr/bin/python3 src/run_experiment.py pilot --runs 2 --model models/yolov8n_416.engine
+    PILOT_A_mem_high_r00         1000 frames  temp 36.0 C  co-runner []
+    PILOT_A_mem_high_r01         1000 frames  temp 37.0 C  co-runner []
+    PILOT_B_mem_high_r00         1000 frames  temp 36.5 C  co-runner []
+    PILOT_B_mem_high_r01         1000 frames  temp 37.0 C  co-runner []
+    PILOT_C_mem_high_r00         1000 frames  temp 37.0 C  co-runner [3.9797532467532464, 3.571092307692307]
+    PILOT_C_mem_high_r01         1000 frames  temp 38.0 C  co-runner [3.608539682539683, 3.721063492063492]
+    PILOT_D_mem_high_r00         1000 frames  temp 38.0 C  co-runner [3.7828219178082185, 3.80050704225352]
+    PILOT_D_mem_high_r01         1000 frames  temp 38.5 C  co-runner [3.7522777777777785, 3.77494366197183]
+    cell A  mean 38.40 ms  between-run CV 0.58%
+    cell B  mean 44.19 ms  between-run CV 0.37%
+    cell C  mean 47.94 ms  between-run CV 1.20%
+    cell D  mean 54.51 ms  between-run CV 0.13%
+    G3: worst CV 1.20% -> about 6 runs per cell needed (minimum 6)
+[13:56:20] note: G2 mem_low +8.7 % (< 10 %) - not used by blocks E1 E2 E3, reported only
+[13:56:20] G1 PASS | G2 cpu control, mem_high PASS, mem_low FAIL | G3 6 runs per cell needed
+[13:56:21] instance 1: gates recorded; every condition of E1 E2 E3 measured 1 time(s)
+
+[13:56:21] ==============================================================================
+[13:56:21] 7/8  Main blocks, instance 1 (every condition 1 time(s))
+[13:56:21] ==============================================================================
+[13:56:22] estimated time for this instance: 0.9 h (rerun the same command to resume after any stop)
+[13:56:22] $ /usr/bin/python3 src/run_experiment.py block E1 --session 1 --runs 1 --model models/yolov8n_416.engine
+    E1_D_mem_high_s1_r00         3000 frames  temp 37.5 C  co-runner [3.7899326424870488, 4.142391891891894]
+    E1_C_mem_high_s1_r00         3000 frames  temp 39.0 C  co-runner [3.5163618421052645, 3.6490649350649367]
+    E1_B_mem_high_s1_r00         3000 frames  temp 39.0 C  co-runner []
+    E1_A_mem_high_s1_r00         3000 frames  temp 35.5 C  co-runner []
+[14:13:03] $ /usr/bin/python3 src/run_experiment.py block E2 --session 1 --runs 1 --model models/yolov8n_416.engine
+    E2_D_cpu_s1_r00              3000 frames  temp 35.0 C  co-runner [56.63314285714284, 60.38857142857141]
+    E2_A_cpu_s1_r00              3000 frames  temp 36.5 C  co-runner []
+    E2_C_cpu_s1_r00              3000 frames  temp 36.5 C  co-runner [58.00551181102363, 60.302362204724425]
+    E2_B_cpu_s1_r00              3000 frames  temp 37.0 C  co-runner []
+[14:28:17] $ /usr/bin/python3 src/run_experiment.py block E3 --session 1 --runs 1 --model models/yolov8n_416.engine
+    E3_A_mem_high_s1_r00         4500 frames  temp 34.5 C  co-runner []
+    E3_B_mem_high_s1_r00         4500 frames  temp 33.5 C  co-runner []
+    E3_C_mem_high_s1_r00         4500 frames  temp 35.0 C  co-runner [3.838239130434784, 3.9802532051282062]
+    E3_D_mem_high_s1_r00         4500 frames  temp 38.0 C  co-runner [3.9076270096463013, 3.877554838709676]
+[14:55:51] instance 1 complete - updating the analysis over all instances
+
+[14:55:51] ==============================================================================
+[14:55:51] 8/8  Analysis over all instances
+[14:55:51] ==============================================================================
+[14:55:51] $ /usr/bin/python3 analysis/summarize.py
+    Traceback (most recent call last):
+      File "analysis/summarize.py", line 17, in <module>
+        from scipy import stats
+      File "/usr/lib/python3/dist-packages/scipy/stats/__init__.py", line 348, in <module>
+        from .stats import *
+      File "/usr/lib/python3/dist-packages/scipy/stats/stats.py", line 177, in <module>
+        from . import distributions
+      File "/usr/lib/python3/dist-packages/scipy/stats/distributions.py", line 13, in <module>
+        from . import _continuous_distns
+      File "/usr/lib/python3/dist-packages/scipy/stats/_continuous_distns.py", line 15, in <module>
+        from scipy._lib._numpy_compat import broadcast_to
+      File "/usr/lib/python3/dist-packages/scipy/_lib/_numpy_compat.py", line 10, in <module>
+        from numpy.testing.nosetester import import_nose
+    ModuleNotFoundError: No module named 'numpy.testing.nosetester'
+[14:55:54] analysis step failed on this device (missing package?). The data is safe: run `python3 runscript.py --compile` on the Mac after pulling.
+[14:55:54] $ /usr/bin/python3 analysis/report.py
+    wrote /home/sitacs/Desktop/CONTEND/results/jetson_nano/REPORT.md
+[14:55:56] done (this command: 114 min). Report: results/jetson_nano/REPORT.md   Next instance: run the same command again
+[14:55:56] $ git add -A results/jetson_nano
+[14:55:57] $ git commit -m results: jetson_nano instance 1 (2026-10-14 14:55)
+    [master 323f401] results: jetson_nano instance 1 (2026-10-14 14:55)
+     94 files changed, 1096 insertions(+)
+     create mode 100644 results/jetson_nano/REPORT.md
+     create mode 100644 results/jetson_nano/instance1/COMPLETE
+     create mode 100644 results/jetson_nano/instance1/derived/choose_config.json
+     create mode 100644 results/jetson_nano/instance1/derived/g1_device.json
+     create mode 100644 results/jetson_nano/instance1/derived/g2.json
+     create mode 100644 results/jetson_nano/instance1/derived/g3.json
+     create mode 100644 results/jetson_nano/instance1/gates.json
+     create mode 100644 results/jetson_nano/instance1/logs/runscript_20261014_125805.log
+     create mode 100644 results/jetson_nano/instance1/logs/runscript_20261014_130143.log
+     create mode 100644 results/jetson_nano/instance1/logs/runscript_20261014_130221.log
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_A_mem_high_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_A_mem_high_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_B_mem_high_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_B_mem_high_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_C_mem_high_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_C_mem_high_s1_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_C_mem_high_s1_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_C_mem_high_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_D_mem_high_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_D_mem_high_s1_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_D_mem_high_s1_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E1/E1_D_mem_high_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_A_cpu_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_A_cpu_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_B_cpu_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_B_cpu_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_C_cpu_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_C_cpu_s1_r00_logs/cpu_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_C_cpu_s1_r00_logs/cpu_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_C_cpu_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_D_cpu_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_D_cpu_s1_r00_logs/cpu_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_D_cpu_s1_r00_logs/cpu_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E2/E2_D_cpu_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_A_mem_high_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_A_mem_high_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_B_mem_high_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_B_mem_high_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_C_mem_high_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_C_mem_high_s1_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_C_mem_high_s1_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_C_mem_high_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_D_mem_high_s1_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_D_mem_high_s1_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_D_mem_high_s1_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/E3/E3_D_mem_high_s1_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_A_cpu_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_A_cpu_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_A_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_A_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_A_mem_low_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_A_mem_low_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_cpu_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_cpu_r00_logs/cpu_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_cpu_r00_logs/cpu_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_cpu_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_mem_high_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_mem_high_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_mem_low_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_mem_low_r00_logs/mem_low_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/G2/G2_C_mem_low_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_A_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_A_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_A_mem_high_r01.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_A_mem_high_r01_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_B_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_B_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_B_mem_high_r01.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_B_mem_high_r01_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_C_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_C_mem_high_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_C_mem_high_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_C_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_C_mem_high_r01.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_C_mem_high_r01_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_C_mem_high_r01_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_C_mem_high_r01_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_D_mem_high_r00.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_D_mem_high_r00_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_D_mem_high_r00_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_D_mem_high_r00_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_D_mem_high_r01.csv.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_D_mem_high_r01_logs/mem_high_0.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_D_mem_high_r01_logs/mem_high_1.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/PILOT/PILOT_D_mem_high_r01_logs/tegrastats.log.gz
+     create mode 100644 results/jetson_nano/instance1/raw/env_20261014_132650.json
+     create mode 100644 results/jetson_nano/instance1/raw/env_20261014_133849.json
+     create mode 100644 results/jetson_nano/instance1/raw/env_20261014_135713.json
+     create mode 100644 results/jetson_nano/instance1/raw/env_20261014_141416.json
+     create mode 100644 results/jetson_nano/instance1/raw/env_20261014_142923.json
+     create mode 100644 results/jetson_nano/instance1/raw/runs.csv
+     create mode 100644 results/jetson_nano/locked_config.yaml
+[14:55:57] $ git pull --rebase
+    error: cannot pull with rebase: You have unstaged changes.
+    error: please commit or stash them.
+[14:55:57] $ git push
+    remote: Invalid username or token. Password authentication is not supported for Git operations.
+    fatal: Authentication failed for 'https://github.com/DevanshSati18/CONTEND.git/'
+[16:49:08] push failed (credentials?). Results are committed locally; run `git push` yourself.
