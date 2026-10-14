@@ -1,0 +1,23 @@
+{
+  "mem_low": {
+    "kind": "bw",
+    "clean_ms": 38.91948125201998,
+    "loaded_ms": 42.67492594799114,
+    "slowdown": 0.09649267089797742,
+    "G2_pass": false
+  },
+  "mem_high": {
+    "kind": "bw",
+    "clean_ms": 38.05069965199618,
+    "loaded_ms": 46.85162770601164,
+    "slowdown": 0.2312947760358397,
+    "G2_pass": true
+  },
+  "cpu": {
+    "kind": "cpu",
+    "clean_ms": 38.02755413998966,
+    "loaded_ms": 37.96115407002253,
+    "slowdown": -0.0017461041465536287,
+    "G2_pass": null
+  }
+}
